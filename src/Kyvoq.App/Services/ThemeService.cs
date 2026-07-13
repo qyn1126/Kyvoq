@@ -59,7 +59,7 @@ public sealed class ThemeService
     }
 
     /// <summary>
-    /// 为窗口启用 WPF UI 的 Mica 背景和系统主题监听。
+    /// 为窗口安全启用 WPF UI 的 Mica 背景和系统主题监听。
     /// </summary>
     /// <param name="window">需要设置外观的窗口。</param>
     /// <param name="theme">当前主题模式。</param>
@@ -83,7 +83,11 @@ public sealed class ThemeService
         }
         else
         {
-            SystemThemeWatcher.UnWatch(window);
+            if (window.IsLoaded)
+            {
+                SystemThemeWatcher.UnWatch(window);
+            }
+
             ApplicationThemeManager.Apply(window);
         }
     }

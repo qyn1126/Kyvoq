@@ -39,7 +39,7 @@ public sealed class WpfUiCollection;
 public sealed class MainWindowLayoutTests
 {
     /// <summary>
-    /// 验证主窗口响应式下限、无黑色焦点框、弹窗原生圆角、菜单布局及呼出隐藏切换行为。
+    /// 验证主窗口响应式下限、无黑色焦点框、固定主题弹窗初始化、菜单布局及呼出隐藏切换行为。
     /// </summary>
     [Fact]
     public void Resize_ShouldApplyResponsiveBreakpointsDownToMinimumSize()
@@ -413,7 +413,7 @@ public sealed class MainWindowLayoutTests
                     "分组名称",
                     string.Empty,
                     themeService,
-                    configuration.Settings.Theme)
+                    AppTheme.Light)
                 {
                     Owner = window,
                     Left = -10000,
@@ -423,6 +423,8 @@ public sealed class MainWindowLayoutTests
                     ShowInTaskbar = false,
                     WindowStartupLocation = WindowStartupLocation.Manual
                 };
+                Assert.False(textInputDialog.IsLoaded);
+                themeService.ApplyWindowBackdrop(textInputDialog, AppTheme.Light);
                 textInputDialog.Show();
                 textInputDialog.UpdateLayout();
                 var fluentTextInputDialog = Assert.IsAssignableFrom<UiFluentWindow>(textInputDialog);
