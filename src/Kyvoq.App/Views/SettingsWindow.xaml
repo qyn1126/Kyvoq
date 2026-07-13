@@ -1,0 +1,173 @@
+<ui:FluentWindow x:Class="Kyvoq.App.Views.SettingsWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:controls="clr-namespace:Kyvoq.App.Controls"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="设置"
+                 Width="560"
+                 SizeToContent="Height"
+                 MaxHeight="760"
+                 WindowStartupLocation="CenterOwner"
+                 ResizeMode="NoResize"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowBackdropType="Mica"
+                 ShowInTaskbar="False">
+    <Grid Background="{DynamicResource WindowBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="48" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="68" />
+        </Grid.RowDefinitions>
+
+        <ui:TitleBar Title="设置"
+                     ShowMaximize="False"
+                     ShowMinimize="False" />
+
+        <ScrollViewer Grid.Row="1"
+                      MaxHeight="630"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="20,12,20,8">
+                <Border Padding="16"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="220" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="12" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="10" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel VerticalAlignment="Center">
+                            <TextBlock FontWeight="SemiBold" Text="主题" />
+                            <TextBlock Margin="0,3,16,0"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="12"
+                                       Text="跟随系统或固定明暗外观" />
+                        </StackPanel>
+                        <ComboBox x:Name="ThemeComboBox" Grid.Column="1" VerticalAlignment="Center">
+                            <ComboBoxItem Tag="System" Content="跟随系统" />
+                            <ComboBoxItem Tag="Light" Content="浅色" />
+                            <ComboBoxItem Tag="Dark" Content="深色" />
+                        </ComboBox>
+
+                        <StackPanel Grid.Row="2" VerticalAlignment="Center">
+                            <TextBlock FontWeight="SemiBold" Text="强调色" />
+                            <TextBlock Margin="0,3,16,0"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="12"
+                                       Text="跟随 Windows 或自行选择" />
+                        </StackPanel>
+                        <ComboBox x:Name="AccentModeComboBox"
+                                  Grid.Row="2"
+                                  Grid.Column="1"
+                                  VerticalAlignment="Center"
+                                  SelectionChanged="AccentModeComboBox_SelectionChanged">
+                            <ComboBoxItem Tag="System" Content="跟随系统" />
+                            <ComboBoxItem Tag="Custom" Content="自定义" />
+                        </ComboBox>
+
+                        <Grid x:Name="CustomAccentPanel" Grid.Row="4" Grid.ColumnSpan="2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="32" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="96" />
+                            </Grid.ColumnDefinitions>
+                            <Border x:Name="AccentColorPreview"
+                                    Width="24"
+                                    Height="24"
+                                    HorizontalAlignment="Left"
+                                    CornerRadius="12"
+                                    BorderBrush="{DynamicResource BorderBrush}"
+                                    BorderThickness="1" />
+                            <TextBlock x:Name="AccentHexText"
+                                       Grid.Column="1"
+                                       VerticalAlignment="Center"
+                                       FontFamily="Cascadia Mono, Consolas" />
+                            <Button Grid.Column="2"
+                                    Style="{StaticResource SecondaryButtonStyle}"
+                                    Content="选择颜色"
+                                    Click="ChooseAccentColor_Click" />
+                        </Grid>
+                    </Grid>
+                </Border>
+
+                <Border Margin="0,12,0,0"
+                        Padding="16"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="呼出主界面" />
+                        <TextBlock Margin="0,3,0,10"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="12"
+                                   Text="在任意程序中按下此组合键即可显示 Kyvoq" />
+                        <controls:HotkeyBox x:Name="MainWindowHotkeyInput"
+                                            MinHeight="36"
+                                            VerticalContentAlignment="Center" />
+                        <TextBlock x:Name="ValidationText"
+                                   Margin="2,6,0,0"
+                                   Foreground="{DynamicResource DangerBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Margin="0,12,0,0"
+                        Padding="16,12"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                    <StackPanel>
+                        <CheckBox x:Name="ItemHotkeysEnabledCheckBox"
+                                  FontWeight="SemiBold"
+                                  Content="启用项目级全局快捷键" />
+                        <CheckBox x:Name="StartWithWindowsCheckBox"
+                                  Margin="0,8,0,0"
+                                  FontWeight="SemiBold"
+                                  Content="登录 Windows 后自动启动 Kyvoq" />
+                    </StackPanel>
+                </Border>
+
+                <Border Margin="0,12,0,0"
+                        Padding="16,12"
+                        Background="{DynamicResource CardBackgroundBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="10">
+                    <StackPanel>
+                        <TextBlock FontWeight="SemiBold" Text="数据目录" />
+                        <TextBlock x:Name="DataDirectoryText"
+                                   Margin="0,4,0,0"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="12"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2"
+                    Margin="20,12,20,16"
+                    HorizontalAlignment="Right"
+                    Orientation="Horizontal">
+            <Button Margin="0,0,8,0"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    Content="取消"
+                    Click="Cancel_Click" />
+            <Button Style="{StaticResource PrimaryButtonStyle}"
+                    Content="保存设置"
+                    Click="Confirm_Click" />
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

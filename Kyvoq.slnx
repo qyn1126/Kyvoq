@@ -1,0 +1,9 @@
+<Solution>
+  <Project Path="src/Kyvoq.Core/Kyvoq.Core.csproj" />
+  <Project Path="src/Kyvoq.App/Kyvoq.App.csproj">
+    <Platform Solution="*|Any CPU" Project="x64" />
+  </Project>
+  <Project Path="tests/Kyvoq.Tests/Kyvoq.Tests.csproj" />
+  <Project Path="tests/Kyvoq.App.Tests/Kyvoq.App.Tests.csproj" />
+  <Project Path="tests/Kyvoq.LaunchFixture/Kyvoq.LaunchFixture.csproj" />
+</Solution>

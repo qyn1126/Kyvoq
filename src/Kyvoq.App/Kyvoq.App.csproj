@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>Kyvoq.App</RootNamespace>
+    <AssemblyName>Kyvoq</AssemblyName>
+    <AssemblyTitle>Kyvoq 快速启动器</AssemblyTitle>
+    <Product>Kyvoq</Product>
+    <Description>高性能、现代化的 Windows 快速启动器</Description>
+    <Version>1.0.0</Version>
+    <NeutralLanguage>zh-Hans</NeutralLanguage>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\Kyvoq.ico</ApplicationIcon>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Kyvoq.Core\Kyvoq.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Kyvoq.App.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="Assets\Kyvoq.ico" />
+    <EmbeddedResource Include="Assets\Kyvoq.ico" LogicalName="Kyvoq.App.Assets.Kyvoq.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="WPF-UI" Version="4.3.0" GeneratePathProperty="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="E:\.nuget\packages\wpf-ui\4.3.0\LICENSE.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Remove="E:\.nuget\packages\wpf-ui\4.3.0\LICENSE.md" />
+    <None Remove="E:\.nuget\packages\wpf-ui\4.3.0\ThirdPartyNotices.txt" />
+    <None Remove="E:\.nuget\packages\wpf-ui\4.3.0\ThirdPartyNotices.txt" />
+    <None Remove="E:\.nuget\packages\wpf-ui\4.3.0\ThirdPartyNotices.txt" />
+    <None Remove="E:\.nuget\packages\wpf-ui\4.3.0\ThirdPartyNotices.txt" />
+    <None Remove="E:\.nuget\packages\wpf-ui\4.3.0\ThirdPartyNotices.txt" />
+    <None Remove="E:\.nuget\packages\wpf-ui\4.3.0\ThirdPartyNotices.txt" />
+  </ItemGroup>
+</Project>
