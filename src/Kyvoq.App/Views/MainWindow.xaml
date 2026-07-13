@@ -155,6 +155,7 @@
                              SelectedItem="{Binding SelectedGroup}"
                              Background="Transparent"
                              BorderThickness="0"
+                             FocusVisualStyle="{x:Null}"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
@@ -163,6 +164,7 @@
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                                 <Setter Property="Background" Value="Transparent" />
                                 <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
                                 <EventSetter Event="MouseEnter" Handler="Group_MouseEnter" />
                                 <Setter Property="Template">
                                     <Setter.Value>
@@ -279,6 +281,7 @@
                              ItemsPanel="{StaticResource NormalItemsPanelTemplate}"
                              Background="Transparent"
                              BorderThickness="0"
+                             FocusVisualStyle="{x:Null}"
                              AllowDrop="True"
                              ScrollViewer.CanContentScroll="True"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
@@ -296,6 +299,7 @@
                                 <Setter Property="VerticalContentAlignment" Value="Stretch" />
                                 <Setter Property="Background" Value="Transparent" />
                                 <Setter Property="BorderThickness" Value="0" />
+                                <Setter Property="FocusVisualStyle" Value="{x:Null}" />
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">

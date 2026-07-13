@@ -2,13 +2,14 @@ using System.Windows;
 using System.Windows.Input;
 using Kyvoq.App.Services;
 using Kyvoq.Core.Models;
+using FluentWindow = Wpf.Ui.Controls.FluentWindow;
 
 namespace Kyvoq.App.Views;
 
 /// <summary>
 /// 提供名称等短文本输入的现代化模态窗口。
 /// </summary>
-public partial class TextInputDialog : Window
+public partial class TextInputDialog : FluentWindow
 {
     private readonly ThemeService themeService;
     private readonly AppTheme theme;

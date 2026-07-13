@@ -16,10 +16,13 @@ using Kyvoq.App.Views;
 using Kyvoq.Core.Models;
 using Kyvoq.Core.Persistence;
 using Kyvoq.Core.Services;
+using UiFluentWindow = Wpf.Ui.Controls.FluentWindow;
 using UiMenuItem = Wpf.Ui.Controls.MenuItem;
 using UiSymbolIcon = Wpf.Ui.Controls.SymbolIcon;
 using UiSymbolRegular = Wpf.Ui.Controls.SymbolRegular;
 using UiVirtualizingWrapPanel = Wpf.Ui.Controls.VirtualizingWrapPanel;
+using UiWindowBackdropType = Wpf.Ui.Controls.WindowBackdropType;
+using UiWindowCornerPreference = Wpf.Ui.Controls.WindowCornerPreference;
 
 namespace Kyvoq.App.Tests.Views;
 
@@ -36,7 +39,7 @@ public sealed class WpfUiCollection;
 public sealed class MainWindowLayoutTests
 {
     /// <summary>
-    /// 验证主窗口响应式下限、分组悬停、单击启动、菜单布局及呼出隐藏切换行为。
+    /// 验证主窗口响应式下限、无黑色焦点框、弹窗原生圆角、菜单布局及呼出隐藏切换行为。
     /// </summary>
     [Fact]
     public void Resize_ShouldApplyResponsiveBreakpointsDownToMinimumSize()
@@ -56,6 +59,7 @@ public sealed class MainWindowLayoutTests
             Window? ownedWindow = null;
             SettingsWindow? settingsWindow = null;
             ItemEditorWindow? itemEditorWindow = null;
+            TextInputDialog? textInputDialog = null;
             SearchWindow? searchWindow = null;
             App? application = null;
             var ownsApplication = false;
@@ -239,6 +243,11 @@ public sealed class MainWindowLayoutTests
 
                 var items = (ListBox)window.FindName("ItemsListBox");
                 var itemContainer = Assert.IsType<ListBoxItem>(items.ItemContainerGenerator.ContainerFromIndex(0));
+                Assert.Null(items.FocusVisualStyle);
+                Assert.Null(itemContainer.FocusVisualStyle);
+                var itemScrollViewers = FindVisualDescendants<ScrollViewer>(items).ToArray();
+                Assert.NotEmpty(itemScrollViewers);
+                Assert.All(itemScrollViewers, scrollViewer => Assert.Null(scrollViewer.FocusVisualStyle));
                 itemContainer.RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
                 {
                     RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent
@@ -252,6 +261,11 @@ public sealed class MainWindowLayoutTests
                 var groupTemplate = groups.ItemTemplate;
                 var firstGroup = Assert.IsType<ListBoxItem>(
                     groups.ItemContainerGenerator.ContainerFromIndex(0));
+                Assert.Null(groups.FocusVisualStyle);
+                Assert.Null(firstGroup.FocusVisualStyle);
+                var groupScrollViewers = FindVisualDescendants<ScrollViewer>(groups).ToArray();
+                Assert.NotEmpty(groupScrollViewers);
+                Assert.All(groupScrollViewers, scrollViewer => Assert.Null(scrollViewer.FocusVisualStyle));
                 Assert.InRange(firstGroup.TranslatePoint(new Point(), window).Y, 0, 70);
                 var firstGroupText = Assert.Single(
                     FindVisualDescendants<TextBlock>(firstGroup),
@@ -394,6 +408,36 @@ public sealed class MainWindowLayoutTests
                     VisualTreeHelper.GetDpi(hotkeyBox).PixelsPerDip);
                 Assert.True(contentHost.ActualHeight >= text.Height - 0.5);
 
+                textInputDialog = new TextInputDialog(
+                    "新建分组",
+                    "分组名称",
+                    string.Empty,
+                    themeService,
+                    configuration.Settings.Theme)
+                {
+                    Owner = window,
+                    Left = -10000,
+                    Top = -10000,
+                    Opacity = 0,
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                    WindowStartupLocation = WindowStartupLocation.Manual
+                };
+                textInputDialog.Show();
+                textInputDialog.UpdateLayout();
+                var fluentTextInputDialog = Assert.IsAssignableFrom<UiFluentWindow>(textInputDialog);
+                Assert.True(fluentTextInputDialog.ExtendsContentIntoTitleBar);
+                Assert.Equal(UiWindowBackdropType.Mica, fluentTextInputDialog.WindowBackdropType);
+                Assert.Equal(UiWindowCornerPreference.Round, fluentTextInputDialog.WindowCornerPreference);
+                Assert.Equal(400, fluentTextInputDialog.MinWidth, 1);
+                Assert.Equal(210, fluentTextInputDialog.MinHeight, 1);
+                Assert.Equal(400, fluentTextInputDialog.ActualWidth, 1);
+                Assert.Equal(210, fluentTextInputDialog.ActualHeight, 1);
+                var textInputRoot = Assert.IsType<Grid>(fluentTextInputDialog.Content);
+                Assert.NotEqual(0, Assert.IsType<SolidColorBrush>(textInputRoot.Background).Color.A);
+                textInputDialog.Close();
+                textInputDialog = null;
+
                 settingsWindow = new SettingsWindow(
                     configuration.Settings,
                     temporaryDirectory,
@@ -432,6 +476,14 @@ public sealed class MainWindowLayoutTests
                 };
                 itemEditorWindow.Show();
                 itemEditorWindow.UpdateLayout();
+                var focusableEditorScrollViewers = FindVisualDescendants<ScrollViewer>(itemEditorWindow)
+                    .Where(scrollViewer => scrollViewer.Focusable)
+                    .ToArray();
+                Assert.NotEmpty(focusableEditorScrollViewers);
+                Assert.Contains(focusableEditorScrollViewers, scrollViewer => scrollViewer.IsKeyboardFocusWithin);
+                Assert.All(
+                    focusableEditorScrollViewers,
+                    scrollViewer => Assert.Null(scrollViewer.FocusVisualStyle));
                 var itemHotkey = Assert.IsType<HotkeyBox>(itemEditorWindow.FindName("HotkeyInput"));
                 Assert.Null(itemEditorWindow.FindName("WorkingDirectoryTextBox"));
                 var environmentVariables = Assert.IsType<ItemsControl>(
@@ -535,6 +587,7 @@ public sealed class MainWindowLayoutTests
             finally
             {
                 searchWindow?.ClosePermanently();
+                textInputDialog?.Close();
                 itemEditorWindow?.Close();
                 settingsWindow?.Close();
                 hotkeyWindow?.Close();
