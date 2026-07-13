@@ -12,8 +12,11 @@ namespace Kyvoq.App.Services;
 internal static class ElevatedLaunchHost
 {
     private static readonly TimeSpan ConnectionTimeout = TimeSpan.FromSeconds(30);
-    internal const PipeOptions ClientPipeOptions =
-        PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly;
+
+    /// <summary>
+    /// 客户端仅启用异步传输，避免 Windows 把 UAC 前后不同完整性级别判定为不同所有者。
+    /// </summary>
+    internal const PipeOptions ClientPipeOptions = PipeOptions.Asynchronous;
 
     /// <summary>
     /// 判断命令行是否请求运行提权辅助模式。

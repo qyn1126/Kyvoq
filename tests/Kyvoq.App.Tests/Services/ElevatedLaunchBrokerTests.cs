@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using Kyvoq.App.Services;
 using Kyvoq.Core.Models;
 
@@ -9,6 +10,74 @@ namespace Kyvoq.App.Tests.Services;
 /// </summary>
 public sealed class ElevatedLaunchBrokerTests
 {
+    /// <summary>
+    /// 验证真实 Kyvoq 辅助进程能够通过命名管道接收环境变量并启动无害夹具。
+    /// </summary>
+    [Fact]
+    public async Task LaunchAsync_ShouldCompleteThroughRealHelperProcess()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var temporaryDirectory = Path.Combine(
+            Path.GetTempPath(),
+            "Kyvoq.App.Tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(temporaryDirectory);
+        try
+        {
+            var kyvoqPath = Path.Combine(AppContext.BaseDirectory, "Kyvoq.exe");
+            var fixturePath = Path.Combine(AppContext.BaseDirectory, "Kyvoq.LaunchFixture.exe");
+            var outputPath = Path.Combine(temporaryDirectory, "elevated-launch-result.txt");
+            Assert.True(File.Exists(kyvoqPath), $"找不到 Kyvoq 辅助程序：{kyvoqPath}");
+            Assert.True(File.Exists(fixturePath), $"找不到启动测试夹具：{fixturePath}");
+            var broker = new ElevatedLaunchBroker(
+                kyvoqPath,
+                startInfo =>
+                {
+                    startInfo.UseShellExecute = false;
+                    startInfo.Verb = string.Empty;
+                    return Process.Start(startInfo);
+                },
+                TimeSpan.FromSeconds(5));
+            var item = new LauncherItem
+            {
+                Name = "管理员代理夹具",
+                Target = fixturePath,
+                Arguments = $"\"{outputPath}\" proxy-test",
+                RunAsAdministrator = true,
+                EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["HTTP_PROXY"] = "http://127.0.0.1:10808",
+                    ["HTTPS_PROXY"] = "http://127.0.0.1:10808",
+                    ["ALL_PROXY"] = "http://127.0.0.1:10808",
+                    ["KYVOQ_TEST_VALUE"] = "pipe environment"
+                }
+            };
+
+            var result = await broker.LaunchAsync(item, cancellationToken);
+
+            Assert.True(result.IsSuccessful, result.ErrorMessage);
+            for (var attempt = 0; attempt < 100 && !File.Exists(outputPath); attempt++)
+            {
+                await Task.Delay(25, cancellationToken);
+            }
+
+            Assert.True(File.Exists(outputPath), "管理员启动夹具没有写入结果文件。");
+            var lines = await File.ReadAllLinesAsync(outputPath, cancellationToken);
+            Assert.Equal("proxy-test", lines[1]);
+            Assert.Equal("pipe environment", lines[2]);
+            Assert.Equal("http://127.0.0.1:10808", lines[3]);
+            Assert.Equal("http://127.0.0.1:10808", lines[4]);
+            Assert.Equal("http://127.0.0.1:10808", lines[5]);
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryDirectory))
+            {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+        }
+    }
+
     /// <summary>
     /// 验证命令行仅包含一次性连接信息，目标和环境变量由管道交给最终进程。
     /// </summary>
@@ -152,12 +221,21 @@ public sealed class ElevatedLaunchBrokerTests
     }
 
     /// <summary>
-    /// 验证提权辅助进程仅连接当前用户创建的命名管道服务端。
+    /// 验证提权辅助进程不会因客户端所有者校验拒绝不同完整性级别的主进程管道。
     /// </summary>
     [Fact]
-    public void ClientPipeOptions_ShouldRestrictConnectionToCurrentUser()
+    public void ClientPipeOptions_ShouldAllowConnectionAcrossElevationLevels()
     {
-        Assert.True(ElevatedLaunchHost.ClientPipeOptions.HasFlag(System.IO.Pipes.PipeOptions.CurrentUserOnly));
+        Assert.False(ElevatedLaunchHost.ClientPipeOptions.HasFlag(System.IO.Pipes.PipeOptions.CurrentUserOnly));
+    }
+
+    /// <summary>
+    /// 验证主进程的命名管道服务端仍限制为当前用户，避免放宽客户端校验时削弱服务端边界。
+    /// </summary>
+    [Fact]
+    public void ServerPipeOptions_ShouldRemainRestrictedToCurrentUser()
+    {
+        Assert.True(ElevatedLaunchBroker.ServerPipeOptions.HasFlag(System.IO.Pipes.PipeOptions.CurrentUserOnly));
     }
 
     /// <summary>

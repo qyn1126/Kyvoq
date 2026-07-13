@@ -13,6 +13,12 @@ namespace Kyvoq.App.Services;
 internal sealed class ElevatedLaunchBroker : IElevatedLaunchBroker
 {
     internal const string CommandSwitch = "--elevated-launch";
+
+    /// <summary>
+    /// 服务端仍限制为创建管道的当前用户，并启用异步传输。
+    /// </summary>
+    internal const PipeOptions ServerPipeOptions =
+        PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly;
     private readonly string executablePath;
     private readonly Func<ProcessStartInfo, Process?> helperStarter;
     private readonly TimeSpan timeout;
@@ -69,7 +75,7 @@ internal sealed class ElevatedLaunchBroker : IElevatedLaunchBroker
             PipeDirection.InOut,
             1,
             PipeTransmissionMode.Byte,
-            PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+            ServerPipeOptions);
         var startInfo = new ProcessStartInfo
         {
             FileName = executablePath,
