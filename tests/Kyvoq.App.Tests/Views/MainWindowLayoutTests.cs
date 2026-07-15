@@ -98,7 +98,26 @@ public sealed class MainWindowLayoutTests
                 Assert.Equal(
                     Color.FromRgb(0x33, 0x66, 0x99),
                     Assert.IsType<Color>(Application.Current!.Resources["AccentColor"]));
+                var solidSettings = configuration.Settings.Clone();
+                solidSettings.WindowMaterial = WindowMaterial.Solid;
+                themeService.ApplyApplicationTheme(solidSettings);
+                Assert.Equal(
+                    byte.MaxValue,
+                    Assert.IsType<SolidColorBrush>(
+                        Application.Current.Resources["WindowBackgroundBrush"]).Color.A);
                 themeService.ApplyApplicationTheme(configuration.Settings);
+                var windowBackground = Assert.IsType<SolidColorBrush>(
+                    Application.Current.Resources["WindowBackgroundBrush"]);
+                Assert.Equal(
+                    Wpf.Ui.Controls.WindowBackdrop.IsSupported(UiWindowBackdropType.Mica)
+                        ? byte.MinValue
+                        : byte.MaxValue,
+                    windowBackground.Color.A);
+                Assert.InRange(
+                    Assert.IsType<SolidColorBrush>(
+                        Application.Current.Resources["ItemHoverBrush"]).Color.A,
+                    (byte)1,
+                    (byte)40);
                 viewModel = new MainViewModel(configuration, store, iconCache);
                 var launchService = new RecordingLaunchService();
                 window = new MainWindow(
@@ -245,6 +264,16 @@ public sealed class MainWindowLayoutTests
                 var itemContainer = Assert.IsType<ListBoxItem>(items.ItemContainerGenerator.ContainerFromIndex(0));
                 Assert.Null(items.FocusVisualStyle);
                 Assert.Null(itemContainer.FocusVisualStyle);
+                AssertTransparentIconFrame(itemContainer, "FullIconFrame");
+                var tileSelectionBorder = Assert.Single(
+                    FindVisualDescendants<Border>(itemContainer),
+                    border => border.Name == "TileSelectionBorder");
+                itemContainer.IsSelected = true;
+                itemContainer.UpdateLayout();
+                Assert.Equal(
+                    byte.MinValue,
+                    Assert.IsType<SolidColorBrush>(tileSelectionBorder.Background).Color.A);
+                itemContainer.IsSelected = false;
                 var itemScrollViewers = FindVisualDescendants<ScrollViewer>(items).ToArray();
                 Assert.NotEmpty(itemScrollViewers);
                 Assert.All(itemScrollViewers, scrollViewer => Assert.Null(scrollViewer.FocusVisualStyle));
@@ -357,6 +386,7 @@ public sealed class MainWindowLayoutTests
                     items.ItemContainerGenerator.ContainerFromIndex(0));
                 Assert.True(itemContainer.ActualWidth > 0);
                 Assert.True(itemContainer.ActualHeight > 0);
+                AssertTransparentIconFrame(itemContainer, "CompactIconFrame");
 
                 window.Width = 100;
                 window.Height = 100;
@@ -413,7 +443,8 @@ public sealed class MainWindowLayoutTests
                     "分组名称",
                     string.Empty,
                     themeService,
-                    AppTheme.Light)
+                    AppTheme.Light,
+                    WindowMaterial.Mica)
                 {
                     Owner = window,
                     Left = -10000,
@@ -424,7 +455,10 @@ public sealed class MainWindowLayoutTests
                     WindowStartupLocation = WindowStartupLocation.Manual
                 };
                 Assert.False(textInputDialog.IsLoaded);
-                themeService.ApplyWindowBackdrop(textInputDialog, AppTheme.Light);
+                themeService.ApplyWindowBackdrop(
+                    textInputDialog,
+                    AppTheme.Light,
+                    WindowMaterial.Mica);
                 textInputDialog.Show();
                 textInputDialog.UpdateLayout();
                 var fluentTextInputDialog = Assert.IsAssignableFrom<UiFluentWindow>(textInputDialog);
@@ -436,7 +470,9 @@ public sealed class MainWindowLayoutTests
                 Assert.Equal(400, fluentTextInputDialog.ActualWidth, 1);
                 Assert.Equal(210, fluentTextInputDialog.ActualHeight, 1);
                 var textInputRoot = Assert.IsType<Grid>(fluentTextInputDialog.Content);
-                Assert.NotEqual(0, Assert.IsType<SolidColorBrush>(textInputRoot.Background).Color.A);
+                Assert.Equal(
+                    byte.MinValue,
+                    Assert.IsType<SolidColorBrush>(textInputRoot.Background).Color.A);
                 textInputDialog.Close();
                 textInputDialog = null;
 
@@ -457,6 +493,11 @@ public sealed class MainWindowLayoutTests
                 settingsWindow.UpdateLayout();
                 var mainWindowHotkey = Assert.IsType<HotkeyBox>(
                     settingsWindow.FindName("MainWindowHotkeyInput"));
+                var materialComboBox = Assert.IsType<ComboBox>(
+                    settingsWindow.FindName("MaterialComboBox"));
+                Assert.Equal(
+                    WindowMaterial.Mica.ToString(),
+                    Assert.IsType<ComboBoxItem>(materialComboBox.SelectedItem).Tag?.ToString());
                 Assert.Equal("Alt+Space", mainWindowHotkey.Text);
                 Assert.Equal(560, settingsWindow.ActualWidth, 1);
                 Assert.InRange(settingsWindow.ActualHeight, 1, 760);
@@ -467,7 +508,8 @@ public sealed class MainWindowLayoutTests
                     iconCache,
                     new AvailableHotkeyService(),
                     themeService,
-                    configuration.Settings.Theme)
+                    configuration.Settings.Theme,
+                    configuration.Settings.WindowMaterial)
                 {
                     Owner = window,
                     Left = -10000,
@@ -523,6 +565,7 @@ public sealed class MainWindowLayoutTests
                 pinButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
                 Assert.Equal("取消固定", pinButton.ToolTip);
                 Assert.Equal("\uE77A", pinIcon.Text);
+                Assert.True(window.Topmost);
                 focusWindow = CreateFocusWindow();
                 focusWindow.Show();
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
@@ -538,6 +581,7 @@ public sealed class MainWindowLayoutTests
                 Assert.False(window.IsVisible);
                 window.ShowAndActivate();
                 Assert.True(pinButton.IsChecked);
+                Assert.True(window.Topmost);
 
                 var escapeEvent = new KeyEventArgs(
                     Keyboard.PrimaryDevice,
@@ -555,6 +599,7 @@ public sealed class MainWindowLayoutTests
                 pinButton.IsChecked = false;
                 pinButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
                 Assert.Equal("固定面板", pinButton.ToolTip);
+                Assert.False(window.Topmost);
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 focusWindow.Topmost = true;
                 focusWindow.Activate();
@@ -644,6 +689,22 @@ public sealed class MainWindowLayoutTests
             var opticalOffset = Assert.IsType<TranslateTransform>(icon.RenderTransform);
             Assert.Equal(-1, opticalOffset.Y, 1);
         });
+    }
+
+    /// <summary>
+    /// 验证启动项目图标框不再绘制白色背景或边框。
+    /// </summary>
+    /// <param name="parent">包含图标框的项目容器。</param>
+    /// <param name="frameName">待查找的图标框名称。</param>
+    private static void AssertTransparentIconFrame(DependencyObject parent, string frameName)
+    {
+        var frame = Assert.Single(
+            FindVisualDescendants<Border>(parent),
+            border => border.Name == frameName);
+        Assert.Equal(new Thickness(0), frame.BorderThickness);
+        Assert.Equal(
+            byte.MinValue,
+            Assert.IsType<SolidColorBrush>(frame.Background).Color.A);
     }
 
     /// <summary>

@@ -324,7 +324,10 @@ public partial class App : Application
             }
             if (mainWindow is not null && themeService is not null && settings.Theme == AppTheme.System)
             {
-                themeService.ApplyWindowBackdrop(mainWindow, AppTheme.System);
+                themeService.ApplyWindowBackdrop(
+                    mainWindow,
+                    AppTheme.System,
+                    settings.WindowMaterial);
             }
 
             searchWindow?.RefreshTheme();

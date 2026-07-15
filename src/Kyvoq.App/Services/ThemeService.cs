@@ -30,7 +30,8 @@ public sealed class ThemeService
         ArgumentNullException.ThrowIfNull(settings);
         currentSettings = settings.Clone();
         var resolvedTheme = ResolveTheme(settings.Theme);
-        ApplicationThemeManager.Apply(resolvedTheme, WindowBackdropType.Mica, updateAccent: false);
+        var backdropType = ResolveBackdrop(resolvedTheme, settings.WindowMaterial);
+        ApplicationThemeManager.Apply(resolvedTheme, backdropType, updateAccent: false);
         if (settings.AccentMode == AccentMode.System || resolvedTheme == UiApplicationTheme.HighContrast)
         {
             ApplicationAccentColorManager.ApplySystemAccent();
@@ -44,7 +45,7 @@ public sealed class ThemeService
                 systemAccentColor: false);
         }
 
-        UpdateCompatibilityResources(resolvedTheme);
+        UpdateCompatibilityResources(resolvedTheme, backdropType);
     }
 
     /// <summary>
@@ -59,26 +60,29 @@ public sealed class ThemeService
     }
 
     /// <summary>
-    /// 为窗口安全启用 WPF UI 的 Mica 背景和系统主题监听。
+    /// 为窗口安全启用指定的 WPF UI 背景材质和系统主题监听。
     /// </summary>
     /// <param name="window">需要设置外观的窗口。</param>
     /// <param name="theme">当前主题模式。</param>
-    public void ApplyWindowBackdrop(Window window, AppTheme theme)
+    /// <param name="material">用户选择的窗口材质。</param>
+    public void ApplyWindowBackdrop(Window window, AppTheme theme, WindowMaterial material)
     {
         ArgumentNullException.ThrowIfNull(window);
+        var resolvedTheme = ResolveTheme(theme);
+        var backdropType = ResolveBackdrop(resolvedTheme, material);
         if (window is FluentWindow fluentWindow)
         {
-            fluentWindow.WindowBackdropType = WindowBackdropType.Mica;
+            fluentWindow.WindowBackdropType = backdropType;
             fluentWindow.WindowCornerPreference = WindowCornerPreference.Round;
         }
 
-        WindowBackgroundManager.UpdateBackground(window, ResolveTheme(theme), WindowBackdropType.Mica);
+        WindowBackgroundManager.UpdateBackground(window, resolvedTheme, backdropType);
 
         if (theme == AppTheme.System)
         {
             SystemThemeWatcher.Watch(
                 window,
-                WindowBackdropType.Mica,
+                backdropType,
                 updateAccents: currentSettings.AccentMode == AccentMode.System);
         }
         else
@@ -112,6 +116,19 @@ public sealed class ThemeService
         0xFF000000u | ((uint)color.R << 16) | ((uint)color.G << 8) | color.B;
 
     /// <summary>
+    /// 将与界面无关的材质设置映射为 WPF UI 背景类型。
+    /// </summary>
+    /// <param name="material">用户选择的窗口材质。</param>
+    /// <returns>对应的 WPF UI 背景类型。</returns>
+    internal static WindowBackdropType ToBackdropType(WindowMaterial material) => material switch
+    {
+        WindowMaterial.Solid => WindowBackdropType.None,
+        WindowMaterial.MicaAlt => WindowBackdropType.Tabbed,
+        WindowMaterial.Acrylic => WindowBackdropType.Acrylic,
+        _ => WindowBackdropType.Mica
+    };
+
+    /// <summary>
     /// 把用户主题选择解析为 WPF UI 应用主题。
     /// </summary>
     /// <param name="theme">用户选择的主题。</param>
@@ -134,10 +151,40 @@ public sealed class ThemeService
     }
 
     /// <summary>
+    /// 解析当前平台实际可用的窗口材质，高对比度或不支持时安全降级。
+    /// </summary>
+    /// <param name="theme">已经解析的应用主题。</param>
+    /// <param name="material">用户选择的窗口材质。</param>
+    /// <returns>当前平台应该实际应用的背景类型。</returns>
+    private static WindowBackdropType ResolveBackdrop(
+        UiApplicationTheme theme,
+        WindowMaterial material)
+    {
+        if (theme == UiApplicationTheme.HighContrast)
+        {
+            return WindowBackdropType.None;
+        }
+
+        var requestedBackdrop = ToBackdropType(material);
+        if (requestedBackdrop == WindowBackdropType.None
+            || WindowBackdrop.IsSupported(requestedBackdrop))
+        {
+            return requestedBackdrop;
+        }
+
+        return WindowBackdrop.IsSupported(WindowBackdropType.Mica)
+            ? WindowBackdropType.Mica
+            : WindowBackdropType.None;
+    }
+
+    /// <summary>
     /// 更新旧版视图仍使用的语义颜色资源，使其与 WPF UI 主题保持一致。
     /// </summary>
     /// <param name="theme">当前具体主题。</param>
-    private static void UpdateCompatibilityResources(UiApplicationTheme theme)
+    /// <param name="backdropType">当前实际使用的窗口背景类型。</param>
+    private static void UpdateCompatibilityResources(
+        UiApplicationTheme theme,
+        WindowBackdropType backdropType)
     {
         if (theme == UiApplicationTheme.HighContrast)
         {
@@ -145,6 +192,7 @@ public sealed class ThemeService
             SetBrush("SidebarBackgroundBrush", SystemColors.WindowColor);
             SetBrush("CardBackgroundBrush", SystemColors.WindowColor);
             SetBrush("CardHoverBrush", SystemColors.HighlightColor);
+            SetBrush("ItemHoverBrush", SystemColors.HighlightColor);
             SetBrush("SelectedBackgroundBrush", SystemColors.HighlightColor);
             SetBrush("TextPrimaryBrush", SystemColors.WindowTextColor);
             SetBrush("TextSecondaryBrush", SystemColors.GrayTextColor);
@@ -158,15 +206,31 @@ public sealed class ThemeService
         }
 
         var dark = theme == UiApplicationTheme.Dark;
-        SetBrush("WindowBackgroundBrush", dark ? "#E61A1B24" : "#F7F8FA");
-        SetBrush("SidebarBackgroundBrush", dark ? "#E6232430" : "#EEF0F5");
-        SetBrush("CardBackgroundBrush", dark ? "#F02B2D39" : "#FCFCFE");
+        var usesBackdrop = backdropType != WindowBackdropType.None;
+        SetBrush(
+            "WindowBackgroundBrush",
+            usesBackdrop ? "#00FFFFFF" : dark ? "#1A1B24" : "#F7F8FA");
+        SetBrush(
+            "SidebarBackgroundBrush",
+            usesBackdrop
+                ? dark ? "#D9232430" : "#D9EEF0F5"
+                : dark ? "#232430" : "#EEF0F5");
+        SetBrush(
+            "CardBackgroundBrush",
+            usesBackdrop
+                ? dark ? "#D92B2D39" : "#D9FCFCFE"
+                : dark ? "#2B2D39" : "#FCFCFE");
         SetBrush("CardHoverBrush", dark ? "#3D7C5CFC" : "#EDE9FF");
+        SetBrush("ItemHoverBrush", dark ? "#18FFFFFF" : "#0D000000");
         SetBrush("SelectedBackgroundBrush", dark ? "#667C5CFC" : "#DED7FF");
         SetBrush("TextPrimaryBrush", dark ? "#F5F4FA" : "#20212A");
         SetBrush("TextSecondaryBrush", dark ? "#A8A9B6" : "#6F7180");
         SetBrush("BorderBrush", dark ? "#26FFFFFF" : "#18000000");
-        SetBrush("OverlayBrush", dark ? "#E61A1B24" : "#E6FFFFFF");
+        SetBrush(
+            "OverlayBrush",
+            usesBackdrop
+                ? dark ? "#D91A1B24" : "#D9FFFFFF"
+                : dark ? "#1A1B24" : "#FFFFFF");
         var accent = ApplicationAccentColorManager.SystemAccent;
         var secondary = ApplicationAccentColorManager.SecondaryAccent;
         Application.Current.Resources["AccentColor"] = accent;

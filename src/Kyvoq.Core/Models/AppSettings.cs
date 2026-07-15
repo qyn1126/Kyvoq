@@ -7,6 +7,8 @@ public sealed class AppSettings
 {
     public AppTheme Theme { get; set; } = AppTheme.System;
 
+    public WindowMaterial WindowMaterial { get; set; } = WindowMaterial.Mica;
+
     public HotkeyGesture MainWindowHotkey { get; set; } = HotkeyGesture.CreateDefaultMainWindow();
 
     public AccentMode AccentMode { get; set; } = AccentMode.System;
@@ -34,6 +36,7 @@ public sealed class AppSettings
     public AppSettings Clone() => new()
     {
         Theme = Theme,
+        WindowMaterial = WindowMaterial,
         MainWindowHotkey = MainWindowHotkey with { },
         AccentMode = AccentMode,
         CustomAccentArgb = CustomAccentArgb,

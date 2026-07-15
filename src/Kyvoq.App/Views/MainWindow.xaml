@@ -108,13 +108,13 @@
                         <ui:MenuItem Header="删除" Icon="{ui:SymbolIcon Delete24}" CommandParameter="{Binding}" Click="DeleteItem_Click" />
                     </ContextMenu>
                 </Grid.ContextMenu>
-                <Border Width="40"
+                <Border x:Name="CompactIconFrame"
+                        Width="40"
                         Height="40"
                         HorizontalAlignment="Center"
                         VerticalAlignment="Center"
-                        Background="{DynamicResource CardBackgroundBrush}"
-                        BorderBrush="{DynamicResource BorderBrush}"
-                        BorderThickness="1"
+                        Background="Transparent"
+                        BorderThickness="0"
                         CornerRadius="12">
                     <Grid>
                         <TextBlock HorizontalAlignment="Center"
@@ -310,10 +310,7 @@
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="TileSelectionBorder" Property="Background" Value="{DynamicResource CardHoverBrush}" />
-                                                </Trigger>
-                                                <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="TileSelectionBorder" Property="Background" Value="{DynamicResource SelectedBackgroundBrush}" />
+                                                    <Setter TargetName="TileSelectionBorder" Property="Background" Value="{DynamicResource ItemHoverBrush}" />
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -347,13 +344,13 @@
                                         </ContextMenu>
                                     </Grid.ContextMenu>
 
-                                    <Border Width="56"
+                                    <Border x:Name="FullIconFrame"
+                                            Width="56"
                                             Height="56"
                                             HorizontalAlignment="Center"
                                             VerticalAlignment="Center"
-                                            Background="{DynamicResource CardBackgroundBrush}"
-                                            BorderBrush="{DynamicResource BorderBrush}"
-                                            BorderThickness="1"
+                                            Background="Transparent"
+                                            BorderThickness="0"
                                             CornerRadius="16">
                                         <Grid>
                                             <TextBlock HorizontalAlignment="Center"

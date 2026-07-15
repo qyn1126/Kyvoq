@@ -8,7 +8,6 @@
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ExtendsContentIntoTitleBar="True"
-        WindowBackdropType="Acrylic"
         ResizeMode="NoResize"
         Background="Transparent"
         ShowInTaskbar="False"

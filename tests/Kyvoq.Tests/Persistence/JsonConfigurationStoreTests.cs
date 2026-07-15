@@ -43,6 +43,7 @@ public sealed class JsonConfigurationStoreTests : IDisposable
         var cancellationToken = TestContext.Current.CancellationToken;
         using var store = new JsonConfigurationStore(temporaryDirectory);
         var initial = await store.LoadAsync(cancellationToken);
+        initial.Configuration.Settings.WindowMaterial = WindowMaterial.MicaAlt;
         initial.Configuration.Groups[0].Items.Add(new LauncherItem
         {
             Name = "记事本",
@@ -54,6 +55,7 @@ public sealed class JsonConfigurationStoreTests : IDisposable
 
         Assert.Equal(ConfigurationLoadState.CreatedDefault, initial.State);
         Assert.Equal(ConfigurationLoadState.Loaded, reloaded.State);
+        Assert.Equal(WindowMaterial.MicaAlt, reloaded.Configuration.Settings.WindowMaterial);
         Assert.Equal("记事本", Assert.Single(reloaded.Configuration.Groups[0].Items).Name);
     }
 

@@ -39,6 +39,11 @@ public static class ConfigurationValidator
             configuration.Settings.Theme = AppTheme.System;
         }
 
+        if (!Enum.IsDefined(configuration.Settings.WindowMaterial))
+        {
+            configuration.Settings.WindowMaterial = WindowMaterial.Mica;
+        }
+
         if (!Enum.IsDefined(configuration.Settings.AccentMode))
         {
             configuration.Settings.AccentMode = AccentMode.System;

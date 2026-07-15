@@ -26,6 +26,7 @@ public sealed class LauncherConfigurationTests
 
         var clone = configuration.Clone();
         clone.Settings.Theme = AppTheme.Dark;
+        clone.Settings.WindowMaterial = WindowMaterial.Acrylic;
         clone.Settings.AccentMode = AccentMode.Custom;
         clone.Settings.CustomAccentArgb = 0xFF336699;
         clone.Groups[0].Name = "新分组";
@@ -33,6 +34,7 @@ public sealed class LauncherConfigurationTests
         clone.Groups[0].Items[0].EnvironmentVariables["KYVOQ_PROFILE"] = "changed";
 
         Assert.Equal(AppTheme.System, configuration.Settings.Theme);
+        Assert.Equal(WindowMaterial.Mica, configuration.Settings.WindowMaterial);
         Assert.Equal(AccentMode.System, configuration.Settings.AccentMode);
         Assert.Equal("常用", configuration.Groups[0].Name);
         Assert.Equal("原项目", configuration.Groups[0].Items[0].Name);

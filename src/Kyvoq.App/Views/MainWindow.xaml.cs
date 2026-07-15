@@ -177,7 +177,11 @@ public partial class MainWindow : Window
 
         Activate();
         Topmost = true;
-        Topmost = false;
+        if (!isPinned)
+        {
+            Topmost = false;
+        }
+
         Focus();
     }
 
@@ -216,7 +220,8 @@ public partial class MainWindow : Window
     /// <param name="eventArgs">事件参数。</param>
     private void HandleSourceInitialized(object? sender, EventArgs eventArgs)
     {
-        themeService.ApplyWindowBackdrop(this, viewModel.Configuration.Settings.Theme);
+        var settings = viewModel.Configuration.Settings;
+        themeService.ApplyWindowBackdrop(this, settings.Theme, settings.WindowMaterial);
         var handle = new WindowInteropHelper(this).Handle;
         var cornerPreference = DwmRoundWindow;
         _ = DwmSetWindowAttribute(
@@ -402,7 +407,8 @@ public partial class MainWindow : Window
             "分组名称",
             string.Empty,
             themeService,
-            viewModel.Configuration.Settings.Theme)
+            viewModel.Configuration.Settings.Theme,
+            viewModel.Configuration.Settings.WindowMaterial)
         {
             Owner = this
         };
@@ -429,7 +435,8 @@ public partial class MainWindow : Window
             "分组名称",
             group.Name,
             themeService,
-            viewModel.Configuration.Settings.Theme)
+            viewModel.Configuration.Settings.Theme,
+            viewModel.Configuration.Settings.WindowMaterial)
         {
             Owner = this
         };
@@ -847,7 +854,7 @@ public partial class MainWindow : Window
 
         viewModel.UpdateSettings(settings);
         themeService.ApplyApplicationTheme(settings);
-        themeService.ApplyWindowBackdrop(this, settings.Theme);
+        themeService.ApplyWindowBackdrop(this, settings.Theme, settings.WindowMaterial);
         SettingsChanged?.Invoke(this, EventArgs.Empty);
     }
 
@@ -881,6 +888,7 @@ public partial class MainWindow : Window
     private void PinButton_Click(object sender, RoutedEventArgs eventArgs)
     {
         isPinned = PinButton.IsChecked == true;
+        Topmost = isPinned;
         var description = isPinned ? "取消固定" : "固定面板";
         PinButton.ToolTip = description;
         PinIcon.Text = isPinned ? "\uE77A" : "\uE718";
@@ -942,7 +950,10 @@ public partial class MainWindow : Window
             await viewModel.FlushSaveAsync();
             await viewModel.ReplaceConfigurationAsync(imported);
             themeService.ApplyApplicationTheme(imported.Settings);
-            themeService.ApplyWindowBackdrop(this, imported.Settings.Theme);
+            themeService.ApplyWindowBackdrop(
+                this,
+                imported.Settings.Theme,
+                imported.Settings.WindowMaterial);
             SettingsChanged?.Invoke(this, EventArgs.Empty);
             MessageBox.Show(this, "配置已导入。", "Kyvoq", MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -1041,7 +1052,8 @@ public partial class MainWindow : Window
             iconCache,
             hotkeyService,
             themeService,
-            viewModel.Configuration.Settings.Theme)
+            viewModel.Configuration.Settings.Theme,
+            viewModel.Configuration.Settings.WindowMaterial)
         {
             Owner = this
         };

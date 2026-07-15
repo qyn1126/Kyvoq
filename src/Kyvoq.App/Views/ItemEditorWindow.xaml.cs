@@ -29,6 +29,7 @@ public partial class ItemEditorWindow : FluentWindow
     private readonly IGlobalHotkeyService hotkeyService;
     private readonly ThemeService themeService;
     private readonly AppTheme theme;
+    private readonly WindowMaterial material;
     private readonly bool isNew;
     private readonly ObservableCollection<EnvironmentVariableEntry> environmentVariables = [];
     private string customIconPath;
@@ -44,13 +45,15 @@ public partial class ItemEditorWindow : FluentWindow
     /// <param name="hotkeyService">快捷键冲突检测服务。</param>
     /// <param name="themeService">主题服务。</param>
     /// <param name="theme">当前主题。</param>
+    /// <param name="material">当前窗口材质。</param>
     public ItemEditorWindow(
         LauncherItem item,
         bool isNew,
         IconCacheService iconCache,
         IGlobalHotkeyService hotkeyService,
         ThemeService themeService,
-        AppTheme theme)
+        AppTheme theme,
+        WindowMaterial material)
     {
         InitializeComponent();
         sourceItem = item?.Clone() ?? throw new ArgumentNullException(nameof(item));
@@ -59,6 +62,7 @@ public partial class ItemEditorWindow : FluentWindow
         this.hotkeyService = hotkeyService;
         this.themeService = themeService;
         this.theme = theme;
+        this.material = material;
         customIconPath = sourceItem.CustomIconPath;
 
         Title = isNew ? "新建启动项目" : "编辑启动项目";
@@ -87,7 +91,7 @@ public partial class ItemEditorWindow : FluentWindow
     /// <param name="sender">当前窗口。</param>
     /// <param name="eventArgs">事件参数。</param>
     private void HandleSourceInitialized(object? sender, EventArgs eventArgs) =>
-        themeService.ApplyWindowBackdrop(this, theme);
+        themeService.ApplyWindowBackdrop(this, theme, material);
 
     /// <summary>
     /// 窗口显示后聚焦最合适的输入框。

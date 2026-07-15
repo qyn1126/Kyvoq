@@ -10,7 +10,6 @@
                  WindowStartupLocation="CenterOwner"
                  ResizeMode="NoResize"
                  ExtendsContentIntoTitleBar="True"
-                 WindowBackdropType="Mica"
                  ShowInTaskbar="False">
     <Grid Background="{DynamicResource WindowBackgroundBrush}">
         <Grid.RowDefinitions>
@@ -41,6 +40,8 @@
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="12" />
                             <RowDefinition Height="Auto" />
+                            <RowDefinition Height="12" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="10" />
                             <RowDefinition Height="Auto" />
                         </Grid.RowDefinitions>
@@ -59,6 +60,23 @@
                         </ComboBox>
 
                         <StackPanel Grid.Row="2" VerticalAlignment="Center">
+                            <TextBlock FontWeight="SemiBold" Text="材质（Windows 11）" />
+                            <TextBlock Margin="0,3,16,0"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       FontSize="12"
+                                       Text="选择窗口背景的透明与模糊效果" />
+                        </StackPanel>
+                        <ComboBox x:Name="MaterialComboBox"
+                                  Grid.Row="2"
+                                  Grid.Column="1"
+                                  VerticalAlignment="Center">
+                            <ComboBoxItem Tag="Solid" Content="纯色" />
+                            <ComboBoxItem Tag="Mica" Content="云母" />
+                            <ComboBoxItem Tag="MicaAlt" Content="云母 Alt" />
+                            <ComboBoxItem Tag="Acrylic" Content="亚克力" />
+                        </ComboBox>
+
+                        <StackPanel Grid.Row="4" VerticalAlignment="Center">
                             <TextBlock FontWeight="SemiBold" Text="强调色" />
                             <TextBlock Margin="0,3,16,0"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
@@ -66,7 +84,7 @@
                                        Text="跟随 Windows 或自行选择" />
                         </StackPanel>
                         <ComboBox x:Name="AccentModeComboBox"
-                                  Grid.Row="2"
+                                  Grid.Row="4"
                                   Grid.Column="1"
                                   VerticalAlignment="Center"
                                   SelectionChanged="AccentModeComboBox_SelectionChanged">
@@ -74,7 +92,7 @@
                             <ComboBoxItem Tag="Custom" Content="自定义" />
                         </ComboBox>
 
-                        <Grid x:Name="CustomAccentPanel" Grid.Row="4" Grid.ColumnSpan="2">
+                        <Grid x:Name="CustomAccentPanel" Grid.Row="6" Grid.ColumnSpan="2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="32" />
                                 <ColumnDefinition Width="*" />

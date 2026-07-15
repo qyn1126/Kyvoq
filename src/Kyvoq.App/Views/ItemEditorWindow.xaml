@@ -11,7 +11,6 @@
                  WindowStartupLocation="CenterOwner"
                  ResizeMode="CanResize"
                  ExtendsContentIntoTitleBar="True"
-                 WindowBackdropType="Mica"
                  ShowInTaskbar="False">
     <Grid Background="{DynamicResource WindowBackgroundBrush}">
         <Grid.RowDefinitions>

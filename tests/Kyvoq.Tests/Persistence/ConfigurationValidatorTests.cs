@@ -180,6 +180,20 @@ public sealed class ConfigurationValidatorTests
     }
 
     /// <summary>
+    /// 验证未定义的窗口材质会回退到默认云母材质。
+    /// </summary>
+    [Fact]
+    public void ValidateAndNormalize_ShouldRepairUnknownWindowMaterial()
+    {
+        var configuration = LauncherConfiguration.CreateDefault();
+        configuration.Settings.WindowMaterial = (WindowMaterial)99;
+
+        ConfigurationValidator.ValidateAndNormalize(configuration);
+
+        Assert.Equal(WindowMaterial.Mica, configuration.Settings.WindowMaterial);
+    }
+
+    /// <summary>
     /// 验证未定义的强调色模式及透明自定义颜色会回退到安全值。
     /// </summary>
     [Fact]

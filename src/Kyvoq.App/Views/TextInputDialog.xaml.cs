@@ -13,6 +13,7 @@ public partial class TextInputDialog : FluentWindow
 {
     private readonly ThemeService themeService;
     private readonly AppTheme theme;
+    private readonly WindowMaterial material;
 
     public string Value => ValueTextBox.Text.Trim();
 
@@ -24,16 +25,19 @@ public partial class TextInputDialog : FluentWindow
     /// <param name="initialValue">初始文本。</param>
     /// <param name="themeService">主题服务。</param>
     /// <param name="theme">当前主题。</param>
+    /// <param name="material">当前窗口材质。</param>
     public TextInputDialog(
         string title,
         string prompt,
         string initialValue,
         ThemeService themeService,
-        AppTheme theme)
+        AppTheme theme,
+        WindowMaterial material)
     {
         InitializeComponent();
         this.themeService = themeService;
         this.theme = theme;
+        this.material = material;
         Title = title;
         TitleText.Text = title;
         PromptText.Text = prompt;
@@ -48,7 +52,7 @@ public partial class TextInputDialog : FluentWindow
     /// <param name="sender">当前窗口。</param>
     /// <param name="eventArgs">事件参数。</param>
     private void HandleSourceInitialized(object? sender, EventArgs eventArgs) =>
-        themeService.ApplyWindowBackdrop(this, theme);
+        themeService.ApplyWindowBackdrop(this, theme, material);
 
     /// <summary>
     /// 在窗口显示后选中初始文本并聚焦输入框。

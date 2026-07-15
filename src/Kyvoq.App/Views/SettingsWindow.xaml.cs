@@ -38,6 +38,12 @@ public partial class SettingsWindow : FluentWindow
         this.hotkeyService = hotkeyService;
         this.themeService = themeService;
         ThemeComboBox.SelectedIndex = (int)sourceSettings.Theme;
+        MaterialComboBox.SelectedItem = MaterialComboBox.Items
+            .OfType<ComboBoxItem>()
+            .First(item => string.Equals(
+                item.Tag?.ToString(),
+                sourceSettings.WindowMaterial.ToString(),
+                StringComparison.Ordinal));
         AccentModeComboBox.SelectedIndex = (int)sourceSettings.AccentMode;
         customAccentColor = ThemeService.ToColor(sourceSettings.CustomAccentArgb);
         UpdateAccentPreview();
@@ -54,7 +60,10 @@ public partial class SettingsWindow : FluentWindow
     /// <param name="sender">当前窗口。</param>
     /// <param name="eventArgs">事件参数。</param>
     private void HandleSourceInitialized(object? sender, EventArgs eventArgs) =>
-        themeService.ApplyWindowBackdrop(this, sourceSettings.Theme);
+        themeService.ApplyWindowBackdrop(
+            this,
+            sourceSettings.Theme,
+            sourceSettings.WindowMaterial);
 
     /// <summary>
     /// 根据强调色模式显示或隐藏自定义颜色选项。
@@ -118,6 +127,10 @@ public partial class SettingsWindow : FluentWindow
                 : AppTheme.System;
         ResultSettings = sourceSettings.Clone();
         ResultSettings.Theme = selectedTheme;
+        ResultSettings.WindowMaterial = MaterialComboBox.SelectedItem is ComboBoxItem materialItem
+            && Enum.TryParse<WindowMaterial>(materialItem.Tag?.ToString(), out var material)
+                ? material
+                : WindowMaterial.Mica;
         ResultSettings.AccentMode = AccentModeComboBox.SelectedItem is ComboBoxItem accentItem
             && Enum.TryParse<AccentMode>(accentItem.Tag?.ToString(), out var accentMode)
                 ? accentMode

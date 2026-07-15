@@ -94,7 +94,8 @@ public partial class SearchWindow : FluentWindow
     {
         if (new System.Windows.Interop.WindowInteropHelper(this).Handle != IntPtr.Zero)
         {
-            themeService.ApplyWindowBackdrop(this, mainViewModel.Configuration.Settings.Theme);
+            var settings = mainViewModel.Configuration.Settings;
+            themeService.ApplyWindowBackdrop(this, settings.Theme, settings.WindowMaterial);
         }
     }
 
@@ -103,8 +104,11 @@ public partial class SearchWindow : FluentWindow
     /// </summary>
     /// <param name="sender">当前窗口。</param>
     /// <param name="eventArgs">事件参数。</param>
-    private void HandleSourceInitialized(object? sender, EventArgs eventArgs) =>
-        themeService.ApplyWindowBackdrop(this, mainViewModel.Configuration.Settings.Theme);
+    private void HandleSourceInitialized(object? sender, EventArgs eventArgs)
+    {
+        var settings = mainViewModel.Configuration.Settings;
+        themeService.ApplyWindowBackdrop(this, settings.Theme, settings.WindowMaterial);
+    }
 
     /// <summary>
     /// 搜索面板失去激活状态时自动隐藏。
