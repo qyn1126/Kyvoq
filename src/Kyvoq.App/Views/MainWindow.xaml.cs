@@ -7,7 +7,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using Microsoft.Win32;
 using Kyvoq.App.Services;
@@ -65,6 +64,8 @@ public partial class MainWindow : Window
     private bool allowClose;
     private bool isPinned;
     private bool autoHideCheckPending;
+    private bool isRepositioningForSummon;
+    private WindowState lastNonMinimizedWindowState;
 
     public event EventHandler? SearchPanelRequested;
 
@@ -109,6 +110,9 @@ public partial class MainWindow : Window
         this.dataDirectory = dataDirectory;
         Icon = BrandIconFactory.CreateImageSource();
         DataContext = viewModel;
+        lastNonMinimizedWindowState = viewModel.Configuration.Settings.IsMaximized
+            ? WindowState.Maximized
+            : WindowState.Normal;
 
         RestoreWindowPlacement();
         viewModel.SaveFailed += HandleSaveFailed;
@@ -131,33 +135,50 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 显示并激活已隐藏或最小化的主窗口。
+    /// 显示并激活主窗口；从隐藏或最小化状态恢复时把窗口定位到鼠标所在显示器。
     /// </summary>
     public void ShowAndActivate()
     {
-        if (!IsVisible)
+        var shouldReposition = !IsVisible || WindowState == WindowState.Minimized;
+        if (shouldReposition)
         {
-            Show();
-        }
+            var restoreMaximized = WindowState == WindowState.Maximized
+                || (WindowState == WindowState.Minimized
+                    && lastNonMinimizedWindowState == WindowState.Maximized)
+                || (!IsLoaded
+                    && viewModel.Configuration.Settings.IsMaximized);
 
-        if (WindowState == WindowState.Minimized)
-        {
-            WindowState = WindowState.Normal;
+            isRepositioningForSummon = true;
+            try
+            {
+                if (IsVisible)
+                {
+                    Hide();
+                }
+
+                if (WindowState != WindowState.Normal)
+                {
+                    WindowState = WindowState.Normal;
+                }
+
+                _ = CursorWindowPositioner.TryPositionNearCursor(this);
+                if (restoreMaximized)
+                {
+                    WindowState = WindowState.Maximized;
+                }
+
+                Show();
+            }
+            finally
+            {
+                isRepositioningForSummon = false;
+            }
         }
 
         Activate();
         Topmost = true;
         Topmost = false;
         Focus();
-        if (SystemParameters.ClientAreaAnimation)
-        {
-            BeginAnimation(
-                OpacityProperty,
-                new DoubleAnimation(0.45, 1, TimeSpan.FromMilliseconds(130))
-                {
-                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-                });
-        }
     }
 
     /// <summary>
@@ -272,7 +293,18 @@ public partial class MainWindow : Window
     /// </summary>
     /// <param name="sender">当前窗口。</param>
     /// <param name="eventArgs">事件参数。</param>
-    private void HandleStateChanged(object? sender, EventArgs eventArgs) => CaptureWindowPlacement();
+    private void HandleStateChanged(object? sender, EventArgs eventArgs)
+    {
+        if (WindowState != WindowState.Minimized)
+        {
+            lastNonMinimizedWindowState = WindowState;
+        }
+
+        if (!isRepositioningForSummon)
+        {
+            CaptureWindowPlacement();
+        }
+    }
 
     /// <summary>
     /// 在 UI 线程向用户展示延迟保存失败信息。
@@ -1323,7 +1355,9 @@ public partial class MainWindow : Window
             bounds.Height,
             bounds.Left,
             bounds.Top,
-            WindowState == WindowState.Maximized);
+            WindowState == WindowState.Maximized
+            || (WindowState == WindowState.Minimized
+                && lastNonMinimizedWindowState == WindowState.Maximized));
     }
 
     /// <summary>

@@ -39,7 +39,7 @@ public sealed class WpfUiCollection;
 public sealed class MainWindowLayoutTests
 {
     /// <summary>
-    /// 验证主窗口响应式下限、无黑色焦点框、固定主题弹窗初始化、菜单布局及呼出隐藏切换行为。
+    /// 验证主窗口响应式下限、弹窗和菜单布局，以及无动画呼出、可见时不重复定位和最大化恢复行为。
     /// </summary>
     [Fact]
     public void Resize_ShouldApplyResponsiveBreakpointsDownToMinimumSize()
@@ -513,6 +513,12 @@ public sealed class MainWindowLayoutTests
                 settingsWindow = null;
 
                 window.ShowAndActivate();
+                Assert.False(window.HasAnimatedProperties);
+                var visibleLeft = window.Left;
+                var visibleTop = window.Top;
+                window.ShowAndActivate();
+                Assert.Equal(visibleLeft, window.Left);
+                Assert.Equal(visibleTop, window.Top);
                 pinButton.IsChecked = true;
                 pinButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
                 Assert.Equal("取消固定", pinButton.ToolTip);
@@ -581,6 +587,13 @@ public sealed class MainWindowLayoutTests
                 Assert.True(window.IsVisible);
                 toggleVisibility.Invoke(window, null);
                 Assert.False(window.IsVisible);
+
+                window.ShowActivated = true;
+                window.WindowState = WindowState.Maximized;
+                window.ShowAndActivate();
+                Assert.Equal(WindowState.Maximized, window.WindowState);
+                Assert.False(window.HasAnimatedProperties);
+                window.Hide();
             }
             catch (Exception exception)
             {
