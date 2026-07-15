@@ -214,7 +214,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 为主窗口应用 Windows 11 Mica 与圆角属性。
+    /// 为主窗口应用用户选择的 Windows 11 原生材质与圆角属性。
     /// </summary>
     /// <param name="sender">当前窗口。</param>
     /// <param name="eventArgs">事件参数。</param>

@@ -64,16 +64,16 @@
                             <TextBlock Margin="0,3,16,0"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="12"
-                                       Text="选择窗口背景的透明与模糊效果" />
+                                       Text="云母适合常驻窗口，亚克力接近开始菜单" />
                         </StackPanel>
                         <ComboBox x:Name="MaterialComboBox"
                                   Grid.Row="2"
                                   Grid.Column="1"
                                   VerticalAlignment="Center">
-                            <ComboBoxItem Tag="Solid" Content="纯色" />
-                            <ComboBoxItem Tag="Mica" Content="云母" />
-                            <ComboBoxItem Tag="MicaAlt" Content="云母 Alt" />
-                            <ComboBoxItem Tag="Acrylic" Content="亚克力" />
+                            <ComboBoxItem Tag="Solid" Content="纯色（兼容）" />
+                            <ComboBoxItem Tag="Mica" Content="云母（窗口）" />
+                            <ComboBoxItem Tag="MicaAlt" Content="云母 Alt（分层）" />
+                            <ComboBoxItem Tag="Acrylic" Content="亚克力（开始菜单）" />
                         </ComboBox>
 
                         <StackPanel Grid.Row="4" VerticalAlignment="Center">

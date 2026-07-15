@@ -41,4 +41,42 @@ public sealed class ThemeServiceTests
     {
         Assert.Equal(expected, ThemeService.ToBackdropType(material));
     }
+
+    /// <summary>
+    /// 验证原生材质在浅色和深色主题下都不被 WPF 内容底色覆盖。
+    /// </summary>
+    /// <param name="dark">是否使用深色主题。</param>
+    /// <param name="backdropType">待验证的透明材质类型。</param>
+    [Theory]
+    [InlineData(false, WindowBackdropType.Mica)]
+    [InlineData(false, WindowBackdropType.Tabbed)]
+    [InlineData(false, WindowBackdropType.Acrylic)]
+    [InlineData(true, WindowBackdropType.Mica)]
+    [InlineData(true, WindowBackdropType.Tabbed)]
+    [InlineData(true, WindowBackdropType.Acrylic)]
+    public void GetWindowBackgroundColor_ShouldLeaveNativeBackdropUncovered(
+        bool dark,
+        WindowBackdropType backdropType)
+    {
+        var color = ThemeService.GetWindowBackgroundColor(dark, backdropType);
+
+        Assert.Equal(byte.MinValue, color.A);
+    }
+
+    /// <summary>
+    /// 验证纯色模式使用随主题变化的不透明回退色。
+    /// </summary>
+    /// <param name="dark">是否使用深色主题。</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void GetWindowBackgroundColor_ShouldUseOpaqueFallbackForSolid(bool dark)
+    {
+        var color = ThemeService.GetWindowBackgroundColor(dark, WindowBackdropType.None);
+
+        Assert.Equal(byte.MaxValue, color.A);
+        Assert.Equal(
+            dark ? Color.FromRgb(0x20, 0x20, 0x20) : Color.FromRgb(0xF3, 0xF3, 0xF3),
+            color);
+    }
 }

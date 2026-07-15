@@ -39,7 +39,7 @@ public sealed class WpfUiCollection;
 public sealed class MainWindowLayoutTests
 {
     /// <summary>
-    /// 验证主窗口响应式下限、弹窗和菜单布局，以及无动画呼出、可见时不重复定位和最大化恢复行为。
+    /// 验证主窗口原生材质合成边界、响应式下限、弹窗和菜单布局，以及无动画呼出、可见时不重复定位和最大化恢复行为。
     /// </summary>
     [Fact]
     public void Resize_ShouldApplyResponsiveBreakpointsDownToMinimumSize()
@@ -108,11 +108,21 @@ public sealed class MainWindowLayoutTests
                 themeService.ApplyApplicationTheme(configuration.Settings);
                 var windowBackground = Assert.IsType<SolidColorBrush>(
                     Application.Current.Resources["WindowBackgroundBrush"]);
+                var supportsNativeMica = OperatingSystem.IsWindowsVersionAtLeast(10, 0, 22621)
+                    && Wpf.Ui.Controls.WindowBackdrop.IsSupported(UiWindowBackdropType.Mica);
                 Assert.Equal(
-                    Wpf.Ui.Controls.WindowBackdrop.IsSupported(UiWindowBackdropType.Mica)
-                        ? byte.MinValue
-                        : byte.MaxValue,
+                    supportsNativeMica ? byte.MinValue : byte.MaxValue,
                     windowBackground.Color.A);
+                var sidebarBackground = Assert.IsType<SolidColorBrush>(
+                    Application.Current.Resources["SidebarBackgroundBrush"]);
+                if (supportsNativeMica)
+                {
+                    Assert.InRange(sidebarBackground.Color.A, (byte)1, (byte)254);
+                }
+                else
+                {
+                    Assert.Equal(byte.MaxValue, sidebarBackground.Color.A);
+                }
                 Assert.InRange(
                     Assert.IsType<SolidColorBrush>(
                         Application.Current.Resources["ItemHoverBrush"]).Color.A,
@@ -142,6 +152,24 @@ public sealed class MainWindowLayoutTests
                 window.UpdateLayout();
                 var windowChrome = Assert.IsType<WindowChrome>(WindowChrome.GetWindowChrome(window));
                 Assert.Equal(new CornerRadius(0), windowChrome.CornerRadius);
+                Assert.Equal(
+                    supportsNativeMica ? new Thickness(-1) : new Thickness(0),
+                    windowChrome.GlassFrameThickness);
+                themeService.ApplyApplicationTheme(solidSettings);
+                themeService.ApplyWindowBackdrop(window, solidSettings.Theme, solidSettings.WindowMaterial);
+                Assert.Equal(new Thickness(0), windowChrome.GlassFrameThickness);
+                Assert.Equal(
+                    byte.MaxValue,
+                    Assert.IsType<SolidColorBrush>(
+                        Application.Current.Resources["WindowBackgroundBrush"]).Color.A);
+                themeService.ApplyApplicationTheme(configuration.Settings);
+                themeService.ApplyWindowBackdrop(
+                    window,
+                    configuration.Settings.Theme,
+                    configuration.Settings.WindowMaterial);
+                Assert.Equal(
+                    supportsNativeMica ? new Thickness(-1) : new Thickness(0),
+                    windowChrome.GlassFrameThickness);
                 Assert.IsType<Grid>(window.Content);
                 Assert.Equal(196, ((ColumnDefinition)window.FindName("SidebarColumn")).ActualWidth, 1);
                 Assert.Null(window.FindName("EmptyState"));
@@ -566,14 +594,7 @@ public sealed class MainWindowLayoutTests
                 Assert.Equal("取消固定", pinButton.ToolTip);
                 Assert.Equal("\uE77A", pinIcon.Text);
                 Assert.True(window.Topmost);
-                focusWindow = CreateFocusWindow();
-                focusWindow.Show();
-                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-                focusWindow.Topmost = true;
-                focusWindow.Activate();
-                focusWindow.Focus();
-                focusWindow.Topmost = false;
-                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+                SimulateDeactivation(window);
                 Assert.True(window.IsVisible);
 
                 var closeButton = Assert.IsType<Button>(window.FindName("CloseButton"));
@@ -600,11 +621,10 @@ public sealed class MainWindowLayoutTests
                 pinButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
                 Assert.Equal("固定面板", pinButton.ToolTip);
                 Assert.False(window.Topmost);
-                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-                focusWindow.Topmost = true;
+                focusWindow = CreateFocusWindow();
+                focusWindow.Show();
                 focusWindow.Activate();
                 focusWindow.Focus();
-                focusWindow.Topmost = false;
                 window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 Assert.False(window.IsVisible);
 
@@ -623,12 +643,6 @@ public sealed class MainWindowLayoutTests
 
                 var toggleVisibility = typeof(MainWindow).GetMethod("ToggleVisibility");
                 Assert.NotNull(toggleVisibility);
-                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
-                focusWindow.Topmost = true;
-                focusWindow.Activate();
-                focusWindow.Focus();
-                focusWindow.Topmost = false;
-                window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
                 Assert.True(window.IsVisible);
                 toggleVisibility.Invoke(window, null);
                 Assert.False(window.IsVisible);
@@ -705,6 +719,20 @@ public sealed class MainWindowLayoutTests
         Assert.Equal(
             byte.MinValue,
             Assert.IsType<SolidColorBrush>(frame.Background).Color.A);
+    }
+
+    /// <summary>
+    /// 直接触发主窗口失焦处理并等待延迟隐藏检查完成。
+    /// </summary>
+    /// <param name="window">待验证的主窗口。</param>
+    private static void SimulateDeactivation(MainWindow window)
+    {
+        var handler = typeof(MainWindow).GetMethod(
+            "HandleDeactivated",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(handler);
+        handler.Invoke(window, [window, EventArgs.Empty]);
+        window.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
     }
 
     /// <summary>

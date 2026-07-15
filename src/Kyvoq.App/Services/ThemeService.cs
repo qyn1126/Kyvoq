@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Shell;
 using Kyvoq.Core.Models;
 using Wpf.Ui.Appearance;
 using Wpf.Ui.Controls;
@@ -60,7 +61,7 @@ public sealed class ThemeService
     }
 
     /// <summary>
-    /// 为窗口安全启用指定的 WPF UI 背景材质和系统主题监听。
+    /// 为窗口安全启用指定的 WPF UI 背景材质、完整客户区合成和系统主题监听。
     /// </summary>
     /// <param name="window">需要设置外观的窗口。</param>
     /// <param name="theme">当前主题模式。</param>
@@ -74,6 +75,12 @@ public sealed class ThemeService
         {
             fluentWindow.WindowBackdropType = backdropType;
             fluentWindow.WindowCornerPreference = WindowCornerPreference.Round;
+        }
+        else if (WindowChrome.GetWindowChrome(window) is { } windowChrome)
+        {
+            windowChrome.GlassFrameThickness = backdropType == WindowBackdropType.None
+                ? new Thickness(0)
+                : new Thickness(-1);
         }
 
         WindowBackgroundManager.UpdateBackground(window, resolvedTheme, backdropType);
@@ -129,6 +136,24 @@ public sealed class ThemeService
     };
 
     /// <summary>
+    /// 获取窗口内容层的主题底色，原生材质模式不再覆盖 DWM 合成结果。
+    /// </summary>
+    /// <param name="dark">是否使用深色主题。</param>
+    /// <param name="backdropType">当前实际使用的窗口背景类型。</param>
+    /// <returns>原生材质使用透明色；纯色模式使用主题对应的不透明回退色。</returns>
+    internal static Color GetWindowBackgroundColor(bool dark, WindowBackdropType backdropType)
+    {
+        if (backdropType != WindowBackdropType.None)
+        {
+            return Colors.Transparent;
+        }
+
+        return dark
+            ? Color.FromRgb(0x20, 0x20, 0x20)
+            : Color.FromRgb(0xF3, 0xF3, 0xF3);
+    }
+
+    /// <summary>
     /// 把用户主题选择解析为 WPF UI 应用主题。
     /// </summary>
     /// <param name="theme">用户选择的主题。</param>
@@ -166,13 +191,22 @@ public sealed class ThemeService
         }
 
         var requestedBackdrop = ToBackdropType(material);
-        if (requestedBackdrop == WindowBackdropType.None
-            || WindowBackdrop.IsSupported(requestedBackdrop))
+        if (requestedBackdrop == WindowBackdropType.None)
         {
             return requestedBackdrop;
         }
 
-        return WindowBackdrop.IsSupported(WindowBackdropType.Mica)
+        var supportsOfficialSystemBackdrop = OperatingSystem.IsWindowsVersionAtLeast(
+            10,
+            0,
+            22621);
+        if (supportsOfficialSystemBackdrop && WindowBackdrop.IsSupported(requestedBackdrop))
+        {
+            return requestedBackdrop;
+        }
+
+        return supportsOfficialSystemBackdrop
+            && WindowBackdrop.IsSupported(WindowBackdropType.Mica)
             ? WindowBackdropType.Mica
             : WindowBackdropType.None;
     }
@@ -207,19 +241,20 @@ public sealed class ThemeService
 
         var dark = theme == UiApplicationTheme.Dark;
         var usesBackdrop = backdropType != WindowBackdropType.None;
-        SetBrush(
-            "WindowBackgroundBrush",
-            usesBackdrop ? "#00FFFFFF" : dark ? "#1A1B24" : "#F7F8FA");
+        var sidebarOpacity = usesBackdrop ? (byte)0xB8 : byte.MaxValue;
+        var cardOpacity = usesBackdrop ? (byte)0x99 : byte.MaxValue;
+        var overlayOpacity = usesBackdrop ? (byte)0xCC : byte.MaxValue;
+        SetBrush("WindowBackgroundBrush", GetWindowBackgroundColor(dark, backdropType));
         SetBrush(
             "SidebarBackgroundBrush",
-            usesBackdrop
-                ? dark ? "#D9232430" : "#D9EEF0F5"
-                : dark ? "#232430" : "#EEF0F5");
+            dark
+                ? Color.FromArgb(sidebarOpacity, 0x20, 0x20, 0x20)
+                : Color.FromArgb(sidebarOpacity, 0xF0, 0xF0, 0xF0));
         SetBrush(
             "CardBackgroundBrush",
-            usesBackdrop
-                ? dark ? "#D92B2D39" : "#D9FCFCFE"
-                : dark ? "#2B2D39" : "#FCFCFE");
+            dark
+                ? Color.FromArgb(cardOpacity, 0x32, 0x32, 0x32)
+                : Color.FromArgb(cardOpacity, 0xFF, 0xFF, 0xFF));
         SetBrush("CardHoverBrush", dark ? "#3D7C5CFC" : "#EDE9FF");
         SetBrush("ItemHoverBrush", dark ? "#18FFFFFF" : "#0D000000");
         SetBrush("SelectedBackgroundBrush", dark ? "#667C5CFC" : "#DED7FF");
@@ -228,9 +263,9 @@ public sealed class ThemeService
         SetBrush("BorderBrush", dark ? "#26FFFFFF" : "#18000000");
         SetBrush(
             "OverlayBrush",
-            usesBackdrop
-                ? dark ? "#D91A1B24" : "#D9FFFFFF"
-                : dark ? "#1A1B24" : "#FFFFFF");
+            dark
+                ? Color.FromArgb(overlayOpacity, 0x20, 0x20, 0x20)
+                : Color.FromArgb(overlayOpacity, 0xF3, 0xF3, 0xF3));
         var accent = ApplicationAccentColorManager.SystemAccent;
         var secondary = ApplicationAccentColorManager.SecondaryAccent;
         Application.Current.Resources["AccentColor"] = accent;

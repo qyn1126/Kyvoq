@@ -100,7 +100,7 @@ public partial class SearchWindow : FluentWindow
     }
 
     /// <summary>
-    /// 应用搜索窗口的 Mica 和深浅色标题属性。
+    /// 应用搜索窗口的原生背景材质和深浅色标题属性。
     /// </summary>
     /// <param name="sender">当前窗口。</param>
     /// <param name="eventArgs">事件参数。</param>

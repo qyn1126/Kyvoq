@@ -15,8 +15,8 @@
             <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}" />
             <SolidColorBrush x:Key="AccentSecondaryBrush" Color="{DynamicResource AccentSecondaryColor}" />
             <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#00FFFFFF" />
-            <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#D9EEF0F5" />
-            <SolidColorBrush x:Key="CardBackgroundBrush" Color="#D9FCFCFE" />
+            <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#B8F0F0F0" />
+            <SolidColorBrush x:Key="CardBackgroundBrush" Color="#99FFFFFF" />
             <SolidColorBrush x:Key="CardHoverBrush" Color="#EDE9FF" />
             <SolidColorBrush x:Key="ItemHoverBrush" Color="#0D000000" />
             <SolidColorBrush x:Key="SelectedBackgroundBrush" Color="#DED7FF" />
@@ -24,7 +24,7 @@
             <SolidColorBrush x:Key="TextSecondaryBrush" Color="#6F7180" />
             <SolidColorBrush x:Key="BorderBrush" Color="#18000000" />
             <SolidColorBrush x:Key="DangerBrush" Color="#E45A68" />
-            <SolidColorBrush x:Key="OverlayBrush" Color="#D9FFFFFF" />
+            <SolidColorBrush x:Key="OverlayBrush" Color="#CCF3F3F3" />
 
             <Style TargetType="TextBlock">
                 <Setter Property="FontFamily" Value="Segoe UI Variable Text, Microsoft YaHei UI" />
