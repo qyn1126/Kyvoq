@@ -241,15 +241,15 @@ public sealed class ThemeService
 
         var dark = theme == UiApplicationTheme.Dark;
         var usesBackdrop = backdropType != WindowBackdropType.None;
-        var sidebarOpacity = usesBackdrop ? (byte)0xB8 : byte.MaxValue;
+        var sidebarOpacity = usesBackdrop ? (byte)0x30 : byte.MaxValue;
         var cardOpacity = usesBackdrop ? (byte)0x99 : byte.MaxValue;
         var overlayOpacity = usesBackdrop ? (byte)0xCC : byte.MaxValue;
         SetBrush("WindowBackgroundBrush", GetWindowBackgroundColor(dark, backdropType));
         SetBrush(
             "SidebarBackgroundBrush",
             dark
-                ? Color.FromArgb(sidebarOpacity, 0x20, 0x20, 0x20)
-                : Color.FromArgb(sidebarOpacity, 0xF0, 0xF0, 0xF0));
+                ? Color.FromArgb(sidebarOpacity, 0x28, 0x28, 0x28)
+                : Color.FromArgb(sidebarOpacity, 0xE8, 0xE8, 0xE8));
         SetBrush(
             "CardBackgroundBrush",
             dark

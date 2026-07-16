@@ -15,7 +15,7 @@
             <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}" />
             <SolidColorBrush x:Key="AccentSecondaryBrush" Color="{DynamicResource AccentSecondaryColor}" />
             <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#00FFFFFF" />
-            <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#B8F0F0F0" />
+            <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#30E8E8E8" />
             <SolidColorBrush x:Key="CardBackgroundBrush" Color="#99FFFFFF" />
             <SolidColorBrush x:Key="CardHoverBrush" Color="#EDE9FF" />
             <SolidColorBrush x:Key="ItemHoverBrush" Color="#0D000000" />

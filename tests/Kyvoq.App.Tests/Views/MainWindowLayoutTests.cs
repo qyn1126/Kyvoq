@@ -105,6 +105,10 @@ public sealed class MainWindowLayoutTests
                     byte.MaxValue,
                     Assert.IsType<SolidColorBrush>(
                         Application.Current.Resources["WindowBackgroundBrush"]).Color.A);
+                Assert.Equal(
+                    byte.MaxValue,
+                    Assert.IsType<SolidColorBrush>(
+                        Application.Current.Resources["SidebarBackgroundBrush"]).Color.A);
                 themeService.ApplyApplicationTheme(configuration.Settings);
                 var windowBackground = Assert.IsType<SolidColorBrush>(
                     Application.Current.Resources["WindowBackgroundBrush"]);
@@ -117,7 +121,7 @@ public sealed class MainWindowLayoutTests
                     Application.Current.Resources["SidebarBackgroundBrush"]);
                 if (supportsNativeMica)
                 {
-                    Assert.InRange(sidebarBackground.Color.A, (byte)1, (byte)254);
+                    Assert.InRange(sidebarBackground.Color.A, (byte)1, (byte)0x40);
                 }
                 else
                 {
