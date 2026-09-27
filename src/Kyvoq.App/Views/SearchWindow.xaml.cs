@@ -22,6 +22,7 @@ public partial class SearchWindow : FluentWindow
     private readonly MainViewModel mainViewModel;
     private readonly ILaunchService launchService;
     private readonly ThemeService themeService;
+    private readonly MessageDialogService messageDialogs;
     private readonly DispatcherTimer searchDebounceTimer;
     private bool allowClose;
     private bool autoHideCheckPending;
@@ -34,10 +35,12 @@ public partial class SearchWindow : FluentWindow
     /// <param name="mainViewModel">主窗口数据源。</param>
     /// <param name="launchService">启动服务。</param>
     /// <param name="themeService">主题服务。</param>
+    /// <param name="messageDialogs">应用共享的消息服务。</param>
     public SearchWindow(
         MainViewModel mainViewModel,
         ILaunchService launchService,
-        ThemeService themeService)
+        ThemeService themeService,
+        MessageDialogService messageDialogs)
     {
         searchDebounceTimer = new DispatcherTimer
         {
@@ -48,6 +51,7 @@ public partial class SearchWindow : FluentWindow
         this.mainViewModel = mainViewModel;
         this.launchService = launchService;
         this.themeService = themeService;
+        this.messageDialogs = messageDialogs;
         DataContext = this;
         SourceInitialized += HandleSourceInitialized;
         Deactivated += HandleDeactivated;
@@ -283,7 +287,7 @@ public partial class SearchWindow : FluentWindow
         var result = await launchService.LaunchAsync(entry.Item);
         if (!result.IsSuccessful)
         {
-            MessageBox.Show(this, result.ErrorMessage, "启动失败", MessageBoxButton.OK, MessageBoxImage.Error);
+            messageDialogs.ShowMessage(this, "启动失败", result.ErrorMessage, MessageDialogSeverity.Error);
             return;
         }
 

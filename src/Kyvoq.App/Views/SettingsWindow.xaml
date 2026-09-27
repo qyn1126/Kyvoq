@@ -162,7 +162,7 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    FontSize="12"
                                    TextWrapping="Wrap"
-                                   Text="管理本机 Steam 账号及备注。双击账号或加号后确认登录；右键可备注或删除。登录会重启 Steam，删除会退出 Steam。" />
+                                   Text="管理本机 Steam 账号及备注。双击账号直接切换，双击加号后确认登录新账号；右键可备注或删除。登录会重启 Steam，删除需确认并退出 Steam。" />
                     </StackPanel>
                 </Border>
 

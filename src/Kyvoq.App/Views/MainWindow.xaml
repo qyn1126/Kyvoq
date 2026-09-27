@@ -451,7 +451,7 @@
                                 </Style.Triggers>
                             </Style>
                         </Grid.Style>
-                        <views:SteamAccountsView DataContext="{Binding SteamAccounts}" />
+                        <views:SteamAccountsView x:Name="SteamAccountsPanel" DataContext="{Binding SteamAccounts}" />
                     </Grid>
                 </Grid>
             </Grid>

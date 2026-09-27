@@ -12,6 +12,7 @@ namespace Kyvoq.App.Views;
 public partial class TextInputDialog : FluentWindow
 {
     private readonly ThemeService themeService;
+    private readonly MessageDialogService messageDialogs;
     private readonly AppTheme theme;
     private readonly WindowMaterial material;
     private readonly bool allowEmpty;
@@ -25,6 +26,7 @@ public partial class TextInputDialog : FluentWindow
     /// <param name="prompt">输入框提示。</param>
     /// <param name="initialValue">初始文本。</param>
     /// <param name="themeService">主题服务。</param>
+    /// <param name="messageDialogs">应用共享的消息服务。</param>
     /// <param name="theme">当前主题。</param>
     /// <param name="material">当前窗口材质。</param>
     /// <param name="allowEmpty">是否允许通过空文本清除现有内容。</param>
@@ -33,12 +35,14 @@ public partial class TextInputDialog : FluentWindow
         string prompt,
         string initialValue,
         ThemeService themeService,
+        MessageDialogService messageDialogs,
         AppTheme theme,
         WindowMaterial material,
         bool allowEmpty = false)
     {
         InitializeComponent();
         this.themeService = themeService;
+        this.messageDialogs = messageDialogs;
         this.theme = theme;
         this.material = material;
         this.allowEmpty = allowEmpty;
@@ -91,7 +95,7 @@ public partial class TextInputDialog : FluentWindow
     {
         if (!allowEmpty && Value.Length == 0)
         {
-            MessageBox.Show(this, "输入内容不能为空。", "Kyvoq", MessageBoxButton.OK, MessageBoxImage.Information);
+            messageDialogs.ShowMessage(this, "Kyvoq", "输入内容不能为空。");
             ValueTextBox.Focus();
             return;
         }

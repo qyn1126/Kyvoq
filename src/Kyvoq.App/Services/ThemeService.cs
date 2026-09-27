@@ -60,6 +60,10 @@ public sealed class ThemeService
         ApplyApplicationTheme(settings);
     }
 
+    /// <summary>为新提示窗口应用最近一次生效的主题和材质设置。</summary>
+    public void ApplyCurrentWindowBackdrop(Window window) =>
+        ApplyWindowBackdrop(window, currentSettings.Theme, currentSettings.WindowMaterial);
+
     /// <summary>
     /// 为窗口安全启用指定的 WPF UI 背景材质、完整客户区合成和系统主题监听。
     /// </summary>

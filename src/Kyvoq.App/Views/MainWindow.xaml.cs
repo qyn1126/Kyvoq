@@ -53,6 +53,7 @@ public partial class MainWindow : Window
     private readonly IconCacheService iconCache;
     private IGlobalHotkeyService? hotkeyService;
     private readonly ThemeService themeService;
+    private readonly MessageDialogService messageDialogs;
     private readonly string dataDirectory;
     private Point dragStart;
     private LauncherItemViewModel? dragItem;
@@ -81,6 +82,7 @@ public partial class MainWindow : Window
     /// <param name="configurationStore">配置导入导出服务。</param>
     /// <param name="iconCache">图标缓存服务。</param>
     /// <param name="themeService">主题服务。</param>
+    /// <param name="messageDialogs">应用共享的消息服务。</param>
     /// <param name="dataDirectory">应用数据目录。</param>
     public MainWindow(
         MainViewModel viewModel,
@@ -88,6 +90,7 @@ public partial class MainWindow : Window
         IConfigurationStore configurationStore,
         IconCacheService iconCache,
         ThemeService themeService,
+        MessageDialogService messageDialogs,
         string dataDirectory)
     {
         InitializeComponent();
@@ -107,6 +110,9 @@ public partial class MainWindow : Window
         this.configurationStore = configurationStore;
         this.iconCache = iconCache;
         this.themeService = themeService;
+        this.messageDialogs = messageDialogs;
+        SteamAccountsPanel.ConfirmAction = (title, message, severity, confirmText) =>
+            messageDialogs.Confirm(this, title, message, severity, confirmText);
         this.dataDirectory = dataDirectory;
         Icon = BrandIconFactory.CreateImageSource();
         DataContext = viewModel;
@@ -327,7 +333,7 @@ public partial class MainWindow : Window
     private void HandleSaveFailed(string message)
     {
         _ = Dispatcher.BeginInvoke(() =>
-            MessageBox.Show(this, message, "Kyvoq", MessageBoxButton.OK, MessageBoxImage.Warning));
+            messageDialogs.ShowMessage(this, "Kyvoq", message, MessageDialogSeverity.Warning));
     }
 
     /// <summary>
@@ -417,6 +423,7 @@ public partial class MainWindow : Window
             "分组名称",
             string.Empty,
             themeService,
+            messageDialogs,
             viewModel.Configuration.Settings.Theme,
             viewModel.Configuration.Settings.WindowMaterial)
         {
@@ -445,6 +452,7 @@ public partial class MainWindow : Window
             "分组名称",
             group.Name,
             themeService,
+            messageDialogs,
             viewModel.Configuration.Settings.Theme,
             viewModel.Configuration.Settings.WindowMaterial)
         {
@@ -598,7 +606,7 @@ public partial class MainWindow : Window
 
         if (TargetClassifier.Classify(item.Target) != LauncherTargetType.Application)
         {
-            MessageBox.Show(this, "只有可执行程序支持管理员身份启动。", "Kyvoq", MessageBoxButton.OK, MessageBoxImage.Information);
+            messageDialogs.ShowMessage(this, "Kyvoq", "只有可执行程序支持管理员身份启动。");
             return;
         }
 
@@ -621,7 +629,7 @@ public partial class MainWindow : Window
 
         if (TargetClassifier.Classify(item.Target) == LauncherTargetType.Url)
         {
-            MessageBox.Show(this, "网址没有本地文件位置。", "Kyvoq", MessageBoxButton.OK, MessageBoxImage.Information);
+            messageDialogs.ShowMessage(this, "Kyvoq", "网址没有本地文件位置。");
             return;
         }
 
@@ -635,7 +643,7 @@ public partial class MainWindow : Window
         }
         catch (Exception exception) when (exception is Win32Exception or FileNotFoundException)
         {
-            MessageBox.Show(this, exception.Message, "无法打开所在位置", MessageBoxButton.OK, MessageBoxImage.Error);
+            messageDialogs.ShowMessage(this, "无法打开所在位置", exception.Message, MessageDialogSeverity.Error);
         }
     }
 
@@ -657,7 +665,7 @@ public partial class MainWindow : Window
         }
         catch (ExternalException exception)
         {
-            MessageBox.Show(this, exception.Message, "无法访问剪贴板", MessageBoxButton.OK, MessageBoxImage.Warning);
+            messageDialogs.ShowMessage(this, "无法访问剪贴板", exception.Message, MessageDialogSeverity.Warning);
         }
     }
 
@@ -866,7 +874,7 @@ public partial class MainWindow : Window
     {
         var settings = viewModel.Configuration.Settings;
         var dialog = new TextInputDialog("账号备注", "备注（留空可清除）", initialValue,
-            themeService, settings.Theme, settings.WindowMaterial, allowEmpty: true)
+            themeService, messageDialogs, settings.Theme, settings.WindowMaterial, allowEmpty: true)
         {
             Owner = this
         };
@@ -994,13 +1002,12 @@ public partial class MainWindow : Window
         try
         {
             var imported = await configurationStore.ImportAsync(dialog.FileName);
-            var confirmation = MessageBox.Show(
+            var confirmation = messageDialogs.Confirm(
                 this,
-                $"将使用 {imported.Groups.Count} 个分组覆盖当前配置。继续吗？\n当前配置会自动保留为 config.json.bak。",
                 "导入配置",
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Warning);
-            if (confirmation != MessageBoxResult.Yes)
+                $"将使用 {imported.Groups.Count} 个分组覆盖当前配置。继续吗？\n当前配置会自动保留为 config.json.bak。",
+                MessageDialogSeverity.Warning, "继续导入");
+            if (!confirmation)
             {
                 return;
             }
@@ -1013,11 +1020,11 @@ public partial class MainWindow : Window
                 imported.Settings.Theme,
                 imported.Settings.WindowMaterial);
             SettingsChanged?.Invoke(this, EventArgs.Empty);
-            MessageBox.Show(this, "配置已导入。", "Kyvoq", MessageBoxButton.OK, MessageBoxImage.Information);
+            messageDialogs.ShowMessage(this, "Kyvoq", "配置已导入。");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            MessageBox.Show(this, exception.Message, "无法导入配置", MessageBoxButton.OK, MessageBoxImage.Error);
+            messageDialogs.ShowMessage(this, "无法导入配置", exception.Message, MessageDialogSeverity.Error);
         }
     }
 
@@ -1044,11 +1051,11 @@ public partial class MainWindow : Window
         try
         {
             await configurationStore.ExportAsync(viewModel.Configuration.Clone(), dialog.FileName);
-            MessageBox.Show(this, "配置已成功导出。", "Kyvoq", MessageBoxButton.OK, MessageBoxImage.Information);
+            messageDialogs.ShowMessage(this, "Kyvoq", "配置已成功导出。");
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
         {
-            MessageBox.Show(this, exception.Message, "无法导出配置", MessageBoxButton.OK, MessageBoxImage.Error);
+            messageDialogs.ShowMessage(this, "无法导出配置", exception.Message, MessageDialogSeverity.Error);
         }
     }
 
@@ -1069,7 +1076,7 @@ public partial class MainWindow : Window
             or UnauthorizedAccessException
             or Win32Exception)
         {
-            MessageBox.Show(this, exception.Message, "无法打开数据目录", MessageBoxButton.OK, MessageBoxImage.Error);
+            messageDialogs.ShowMessage(this, "无法打开数据目录", exception.Message, MessageDialogSeverity.Error);
         }
     }
 
@@ -1127,7 +1134,7 @@ public partial class MainWindow : Window
         var result = await launchService.LaunchAsync(item);
         if (!result.IsSuccessful)
         {
-            MessageBox.Show(this, result.ErrorMessage, "启动失败", MessageBoxButton.OK, MessageBoxImage.Error);
+            messageDialogs.ShowMessage(this, "启动失败", result.ErrorMessage, MessageDialogSeverity.Error);
         }
     }
 

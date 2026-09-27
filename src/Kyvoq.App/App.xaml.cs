@@ -23,12 +23,17 @@ public partial class App : Application
     private SearchWindow? searchWindow;
     private GlobalHotkeyService? hotkeyService;
     private TrayIconService? trayIconService;
-    private ThemeService? themeService;
+    private readonly ThemeService themeService = new();
+    private readonly MessageDialogService messageDialogs;
     private WindowsStartupService? startupService;
     private ILaunchService? launchService;
     private bool exiting;
+    private bool handlingDispatcherException;
     private bool mainWindowConflictNotified;
     private bool? diagnosticLoggingEnabled;
+
+    /// <summary>提前创建消息服务，使配置加载或窗口创建失败时也能展示应用样式的提示。</summary>
+    public App() => messageDialogs = new MessageDialogService(themeService);
 
     /// <summary>
     /// 初始化单实例通信、配置、窗口、托盘和全局快捷键。
@@ -47,6 +52,7 @@ public partial class App : Application
         DispatcherUnhandledException += HandleDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += HandleUnhandledException;
         TaskScheduler.UnobservedTaskException += HandleUnobservedTaskException;
+        themeService.ApplyApplicationTheme(new AppSettings());
 
         singleInstanceService = new SingleInstanceService("Kyvoq.FastLauncher");
         if (!singleInstanceService.IsPrimaryInstance())
@@ -65,7 +71,6 @@ public partial class App : Application
         DiagnosticLog.Current.Write("Application.Start",
             $"Background={eventArgs.Args.Contains("--background", StringComparer.OrdinalIgnoreCase)}; "
             + $"ConfigurationState={loadResult.State}; RecoveryMessage={loadResult.Message}");
-        themeService = new ThemeService();
         themeService.ApplyApplicationTheme(loadResult.Configuration.Settings);
         SystemEvents.UserPreferenceChanged += HandleUserPreferenceChanged;
         SystemEvents.SessionSwitch += HandleSessionSwitch;
@@ -82,11 +87,12 @@ public partial class App : Application
             configurationStore,
             iconCacheService,
             themeService,
+            messageDialogs,
             dataDirectory);
         MainWindow = mainWindow;
         hotkeyService = new GlobalHotkeyService(mainWindow);
         mainWindow.AttachHotkeyService(hotkeyService);
-        searchWindow = new SearchWindow(mainViewModel, launchService, themeService);
+        searchWindow = new SearchWindow(mainViewModel, launchService, themeService, messageDialogs);
         trayIconService = new TrayIconService(loadResult.Configuration.Settings.ItemHotkeysEnabled);
 
         WireEvents();
@@ -111,14 +117,13 @@ public partial class App : Application
 
         if (loadResult.Message.Length > 0)
         {
-            MessageBox.Show(
+            messageDialogs.ShowMessage(
                 mainWindow,
-                loadResult.Message,
                 "Kyvoq 配置恢复",
-                MessageBoxButton.OK,
+                loadResult.Message,
                 loadResult.State == ConfigurationLoadState.RecoveredFromBackup
-                    ? MessageBoxImage.Warning
-                    : MessageBoxImage.Error);
+                    ? MessageDialogSeverity.Warning
+                    : MessageDialogSeverity.Error);
         }
     }
 
@@ -196,12 +201,11 @@ public partial class App : Application
         var result = await launchService.LaunchAsync(item);
         if (!result.IsSuccessful)
         {
-            MessageBox.Show(
+            messageDialogs.ShowMessage(
                 mainWindow,
-                result.ErrorMessage,
                 "启动失败",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+                result.ErrorMessage,
+                MessageDialogSeverity.Error);
         }
     }
 
@@ -223,12 +227,11 @@ public partial class App : Application
         if (!report.MainWindowRegistered && !mainWindowConflictNotified)
         {
             mainWindowConflictNotified = true;
-            _ = Dispatcher.BeginInvoke(() => MessageBox.Show(
+            _ = Dispatcher.BeginInvoke(() => messageDialogs.ShowMessage(
                 mainWindow,
-                "呼出主界面的快捷键已被其他程序占用，请在设置中更换。",
                 "快捷键冲突",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning));
+                "呼出主界面的快捷键已被其他程序占用，请在设置中更换。",
+                MessageDialogSeverity.Warning));
         }
         else if (report.MainWindowRegistered)
         {
@@ -242,7 +245,7 @@ public partial class App : Application
     private void HandleSettingsChanged()
     {
         DiagnosticLog.Current.Write("Settings.Applied", "应用新的界面和系统设置。");
-        if (themeService is not null && mainViewModel is not null)
+        if (mainViewModel is not null)
         {
             themeService.ApplyApplicationTheme(mainViewModel.Configuration.Settings);
         }
@@ -273,12 +276,11 @@ public partial class App : Application
             DiagnosticLog.Current.Write("StartupRegistration.Failed", $"Enabled={settings.StartWithWindows}", exception);
             if (showErrors)
             {
-                MessageBox.Show(
+                messageDialogs.ShowMessage(
                     mainWindow,
-                    $"无法更新开机启动项：{exception.Message}",
                     "Kyvoq",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning);
+                    $"无法更新开机启动项：{exception.Message}",
+                    MessageDialogSeverity.Warning);
             }
         }
     }
@@ -326,12 +328,11 @@ public partial class App : Application
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
         {
             DiagnosticLog.Current.Write("Application.ExitSaveFailed", "退出前保存配置失败。", exception);
-            MessageBox.Show(
+            messageDialogs.ShowMessage(
                 mainWindow,
-                $"退出前保存配置失败：{exception.Message}",
                 "Kyvoq",
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
+                $"退出前保存配置失败：{exception.Message}",
+                MessageDialogSeverity.Warning);
         }
 
         trayIconService?.Dispose();
@@ -355,11 +356,11 @@ public partial class App : Application
 
         _ = Dispatcher.BeginInvoke(() =>
         {
-            if (themeService is not null && mainViewModel is not null)
+            if (mainViewModel is not null)
             {
                 themeService.ApplyApplicationTheme(mainViewModel.Configuration.Settings);
             }
-            if (mainWindow is not null && themeService is not null && settings.Theme == AppTheme.System)
+            if (mainWindow is not null && settings.Theme == AppTheme.System)
             {
                 themeService.ApplyWindowBackdrop(
                     mainWindow,
@@ -381,14 +382,27 @@ public partial class App : Application
         DispatcherUnhandledExceptionEventArgs eventArgs)
     {
         DiagnosticLog.Current.Write("Exception.Dispatcher", "界面线程出现未处理异常。", eventArgs.Exception);
-        MessageBox.Show(
-            mainWindow,
-            $"Kyvoq 遇到未预期错误：{eventArgs.Exception.Message}",
-            "Kyvoq",
-            MessageBoxButton.OK,
-            MessageBoxImage.Error);
         eventArgs.Handled = true;
-        _ = ExitAsync();
+        if (handlingDispatcherException)
+        {
+            Shutdown(1);
+            return;
+        }
+
+        handlingDispatcherException = true;
+        try
+        {
+            messageDialogs.ShowMessage(mainWindow, "Kyvoq",
+                $"Kyvoq 遇到未预期错误：{eventArgs.Exception.Message}", MessageDialogSeverity.Error);
+        }
+        catch (Exception exception)
+        {
+            DiagnosticLog.Current.Write("Exception.DialogFailed", "异常提示窗口无法显示。", exception);
+        }
+        finally
+        {
+            _ = ExitAsync();
+        }
     }
 
     /// <summary>
@@ -408,9 +422,8 @@ public partial class App : Application
         {
             if (showErrors)
             {
-                MessageBox.Show(
-                    $"无法开启诊断日志：{DiagnosticLog.Current.LastError}",
-                    "Kyvoq 日志", MessageBoxButton.OK, MessageBoxImage.Warning);
+                messageDialogs.ShowMessage(mainWindow, "Kyvoq 日志",
+                    $"无法开启诊断日志：{DiagnosticLog.Current.LastError}", MessageDialogSeverity.Warning);
             }
             return;
         }

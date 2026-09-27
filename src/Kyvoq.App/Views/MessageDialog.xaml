@@ -1,0 +1,77 @@
+<ui:FluentWindow x:Class="Kyvoq.App.Views.MessageDialog"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 Title="Kyvoq"
+                 Width="440"
+                 MinWidth="320"
+                 MinHeight="0"
+                 SizeToContent="Height"
+                 WindowStyle="None"
+                 ResizeMode="NoResize"
+                 ExtendsContentIntoTitleBar="True"
+                 WindowCornerPreference="Round"
+                 Background="Transparent"
+                 ShowInTaskbar="False"
+                 PreviewKeyDown="Dialog_PreviewKeyDown">
+    <ui:FluentWindow.Resources>
+        <DataTemplate x:Key="DialogButtonContentTemplate">
+            <TextBlock Text="{Binding}" Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+        </DataTemplate>
+        <Style x:Key="DialogFocusVisualStyle" TargetType="Control">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Border Margin="3" CornerRadius="7" BorderThickness="2"
+                                BorderBrush="{DynamicResource TextPrimaryBrush}" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </ui:FluentWindow.Resources>
+    <Grid Background="{DynamicResource WindowBackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="58" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Background="Transparent" MouseLeftButtonDown="Header_MouseLeftButtonDown">
+            <TextBlock x:Name="TitleText" Margin="22,0,60,0"
+                       VerticalAlignment="Center" FontSize="17" FontWeight="SemiBold"
+                       TextTrimming="CharacterEllipsis" />
+            <Button x:Name="CloseButton" HorizontalAlignment="Right" Margin="0,10,12,10"
+                    Style="{StaticResource IconButtonStyle}" AutomationProperties.Name="关闭"
+                    FocusVisualStyle="{StaticResource DialogFocusVisualStyle}"
+                    Click="Cancel_Click">
+                <TextBlock FontFamily="Segoe Fluent Icons" FontSize="14" Text="&#xE8BB;" />
+            </Button>
+        </Grid>
+
+        <Grid Grid.Row="1" Margin="22,8,22,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="SeverityIcon" Margin="0,1,14,0" VerticalAlignment="Top"
+                       FontFamily="Segoe Fluent Icons" FontSize="24"
+                       Foreground="{DynamicResource AccentBrush}" />
+            <ScrollViewer x:Name="MessageScrollViewer" Grid.Column="1"
+                          HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                <TextBlock x:Name="MessageText" TextWrapping="Wrap" FontSize="14"
+                           Foreground="{DynamicResource TextSecondaryBrush}" />
+            </ScrollViewer>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Margin="22,0,22,16" HorizontalAlignment="Right" Orientation="Horizontal">
+            <Button x:Name="CancelButton" Margin="0,0,10,0" Content="取消"
+                    ContentTemplate="{StaticResource DialogButtonContentTemplate}"
+                    FocusVisualStyle="{StaticResource DialogFocusVisualStyle}"
+                    Style="{StaticResource SecondaryButtonStyle}" Click="Cancel_Click" />
+            <Button x:Name="ConfirmButton" Content="确定"
+                    ContentTemplate="{StaticResource DialogButtonContentTemplate}"
+                    FocusVisualStyle="{StaticResource DialogFocusVisualStyle}"
+                    Style="{StaticResource PrimaryButtonStyle}" Click="Confirm_Click" />
+        </StackPanel>
+    </Grid>
+</ui:FluentWindow>

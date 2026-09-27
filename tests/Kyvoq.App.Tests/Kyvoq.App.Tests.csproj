@@ -19,4 +19,7 @@
     <ProjectReference Include="..\..\src\Kyvoq.App\Kyvoq.App.csproj" />
     <ProjectReference Include="..\Kyvoq.LaunchFixture\Kyvoq.LaunchFixture.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\src\Kyvoq.App\App.xaml" Link="Resources\App.xaml" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>
