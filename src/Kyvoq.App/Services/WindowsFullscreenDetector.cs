@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.Win32.SafeHandles;
+using Kyvoq.Core.Services;
 
 namespace Kyvoq.App.Services;
 
@@ -21,7 +22,10 @@ internal sealed record FullscreenWindowSnapshot(
     bool IsCurrentProcess,
     bool IsFramedMaximized,
     ScreenRectangle? WindowBounds,
-    ScreenRectangle? MonitorBounds);
+    ScreenRectangle? MonitorBounds,
+    string? WindowClassName = null,
+    long WindowHandle = 0,
+    uint ProcessId = 0);
 
 /// <summary>
 /// 使用 Windows 前台窗口、DWM 和通知状态检测独占或无边框全屏。
@@ -39,6 +43,14 @@ internal sealed class WindowsFullscreenDetector : IFullscreenDetector
     private const uint MonitorDefaultToNearest = 2;
     private const uint ProcessQueryLimitedInformation = 0x1000;
     private const int BoundaryTolerance = 2;
+    private static readonly HashSet<string> ExcludedShellWindowClasses = new(
+        [
+            "Progman",
+            "WorkerW",
+            "Shell_TrayWnd",
+            "Shell_SecondaryTrayWnd"
+        ],
+        StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> ExcludedBrowserExecutables = new(
         [
             "msedge.exe",
@@ -103,26 +115,56 @@ internal sealed class WindowsFullscreenDetector : IFullscreenDetector
                 || snapshot.IsMinimized
                 || snapshot.IsCloaked
                 || snapshot.IsSystemWindow
-                || snapshot.IsCurrentProcess
-                || IsExcludedBrowser(snapshot.ExecutablePath))
+                || snapshot.IsCurrentProcess)
             {
-                return false;
+                return ReportDetection(snapshot, false, "NoEligibleForegroundWindow");
+            }
+
+            if (IsExcludedShellWindow(snapshot.WindowClassName))
+            {
+                return ReportDetection(snapshot, false, "ShellWindow");
+            }
+
+            if (IsExcludedBrowser(snapshot.ExecutablePath))
+            {
+                return ReportDetection(snapshot, false, "Browser");
             }
 
             if (exclusiveFullscreenProvider())
             {
-                return true;
+                return ReportDetection(snapshot, true, "ExclusiveFullscreen");
             }
 
-            return !snapshot.IsFramedMaximized
+            var coversMonitor = !snapshot.IsFramedMaximized
                 && snapshot.WindowBounds is ScreenRectangle windowBounds
                 && snapshot.MonitorBounds is ScreenRectangle monitorBounds
                 && MatchesMonitorBounds(windowBounds, monitorBounds);
+            return ReportDetection(snapshot, coversMonitor,
+                coversMonitor ? "BorderlessFullscreen" : "Windowed");
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            DiagnosticLog.Current.Write("Fullscreen.Error", "检测失败，放行快捷键。", exception);
             return false;
         }
+    }
+
+    /// <summary>
+    /// 记录每次判断的原因及窗口快照，便于识别桌面误判或焦点问题。
+    /// </summary>
+    /// <param name="snapshot">本次前台窗口快照。</param>
+    /// <param name="suppressed">是否拦截快捷键。</param>
+    /// <param name="reason">判断原因。</param>
+    /// <returns>原始判断结果。</returns>
+    private static bool ReportDetection(FullscreenWindowSnapshot? snapshot, bool suppressed, string reason)
+    {
+        if (DiagnosticLog.Current.IsEnabled)
+        {
+            DiagnosticLog.Current.Write("Fullscreen.Check",
+                $"Suppressed={suppressed}; Reason={reason}; Snapshot={snapshot}");
+        }
+
+        return suppressed;
     }
 
     /// <summary>
@@ -149,16 +191,44 @@ internal sealed class WindowsFullscreenDetector : IFullscreenDetector
             processId == (uint)Environment.ProcessId,
             IsFramedMaximizedWindow(windowHandle),
             TryGetWindowBounds(windowHandle),
-            TryGetMonitorBounds(windowHandle));
+            TryGetMonitorBounds(windowHandle),
+            TryGetWindowClassName(windowHandle),
+            windowHandle.ToInt64(),
+            processId);
+    }
+
+    /// <summary>
+    /// 识别桌面承载窗口和任务栏，避免把覆盖显示器的 Shell 窗口误判为全屏程序。
+    /// </summary>
+    /// <param name="windowClassName">前台窗口类名。</param>
+    /// <returns>属于桌面或任务栏时返回 <see langword="true"/>。</returns>
+    private static bool IsExcludedShellWindow(string? windowClassName) =>
+        windowClassName is not null
+        && ExcludedShellWindowClasses.Contains(windowClassName);
+
+    /// <summary>
+    /// 读取窗口类名，以识别不等于 GetDesktopWindow 或 GetShellWindow 的桌面窗口。
+    /// </summary>
+    /// <param name="windowHandle">目标窗口句柄。</param>
+    /// <returns>成功时返回窗口类名，否则返回 <see langword="null"/>。</returns>
+    private static string? TryGetWindowClassName(IntPtr windowHandle)
+    {
+        var className = new StringBuilder(256);
+        return GetClassName(windowHandle, className, className.Capacity) > 0
+            ? className.ToString()
+            : null;
     }
 
     /// <summary>
     /// 查询 Windows 是否正在运行独占 Direct3D 全屏程序。
     /// </summary>
     /// <returns>系统明确报告独占 Direct3D 全屏时返回 <see langword="true"/>。</returns>
-    private static bool DetectExclusiveFullscreen() =>
-        SHQueryUserNotificationState(out var state) >= 0
-        && state == QueryUserNotificationState.RunningDirect3DFullscreen;
+    private static bool DetectExclusiveFullscreen()
+    {
+        var result = SHQueryUserNotificationState(out var state);
+        DiagnosticLog.Current.Write("Fullscreen.NotificationState", $"HResult={result}; State={(int)state}");
+        return result >= 0 && state == QueryUserNotificationState.RunningDirect3DFullscreen;
+    }
 
     /// <summary>
     /// 判断可执行文件是否属于无需抑制快捷键的主流浏览器。
@@ -371,6 +441,16 @@ internal sealed class WindowsFullscreenDetector : IFullscreenDetector
     /// <returns>Shell 窗口句柄。</returns>
     [DllImport("user32.dll")]
     private static extern IntPtr GetShellWindow();
+
+    /// <summary>
+    /// 获取窗口所属的 Win32 窗口类名。
+    /// </summary>
+    /// <param name="windowHandle">目标窗口句柄。</param>
+    /// <param name="className">接收窗口类名的缓冲区。</param>
+    /// <param name="maximumCount">缓冲区字符容量。</param>
+    /// <returns>成功复制的字符数；失败时返回零。</returns>
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr windowHandle, StringBuilder className, int maximumCount);
 
     /// <summary>
     /// 判断窗口当前是否可见。

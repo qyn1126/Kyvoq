@@ -122,6 +122,7 @@ public partial class MainWindow : Window
         Deactivated += HandleDeactivated;
         StateChanged += HandleStateChanged;
         SizeChanged += HandleSizeChanged;
+        IsVisibleChanged += HandleVisibilityChanged;
         UpdateResponsiveLayout();
     }
 
@@ -139,6 +140,8 @@ public partial class MainWindow : Window
     /// </summary>
     public void ShowAndActivate()
     {
+        DiagnosticLog.Current.Write("MainWindow.ShowRequested",
+            $"Visible={IsVisible}; Active={IsActive}; State={WindowState}; Pinned={isPinned}");
         var shouldReposition = !IsVisible || WindowState == WindowState.Minimized;
         if (shouldReposition)
         {
@@ -175,14 +178,16 @@ public partial class MainWindow : Window
             }
         }
 
-        Activate();
+        var activated = Activate();
         Topmost = true;
         if (!isPinned)
         {
             Topmost = false;
         }
 
-        Focus();
+        var focused = Focus();
+        DiagnosticLog.Current.Write("MainWindow.ShowCompleted",
+            $"ActivateResult={activated}; FocusResult={focused}; Visible={IsVisible}; Active={IsActive}; State={WindowState}");
     }
 
     /// <summary>
@@ -197,6 +202,7 @@ public partial class MainWindow : Window
         {
             CaptureWindowPlacement();
             Hide();
+            DiagnosticLog.Current.Write("MainWindow.Hidden", "呼出快捷键切换为隐藏。");
             return;
         }
 
@@ -270,6 +276,8 @@ public partial class MainWindow : Window
     /// <param name="eventArgs">激活状态变化参数。</param>
     private void HandleDeactivated(object? sender, EventArgs eventArgs)
     {
+        DiagnosticLog.Current.Write("MainWindow.Deactivated",
+            $"Pinned={isPinned}; Closing={allowClose}; Visible={IsVisible}");
         if (isPinned || allowClose || autoHideCheckPending)
         {
             return;
@@ -290,6 +298,7 @@ public partial class MainWindow : Window
 
             CaptureWindowPlacement();
             Hide();
+            DiagnosticLog.Current.Write("MainWindow.Hidden", "失去焦点后自动隐藏。");
         });
     }
 
@@ -367,6 +376,7 @@ public partial class MainWindow : Window
         }
         else if (Keyboard.Modifiers == ModifierKeys.None
                  && eventArgs.Key == Key.Enter
+                 && !viewModel.IsSteamGroupSelected
                  && ItemsListBox.SelectedItem is LauncherItemViewModel item)
         {
             eventArgs.Handled = true;
@@ -388,10 +398,10 @@ public partial class MainWindow : Window
     /// <param name="eventArgs">鼠标事件参数。</param>
     private void Group_MouseEnter(object sender, MouseEventArgs eventArgs)
     {
-        if (sender is ListBoxItem { DataContext: LauncherGroupViewModel group }
-            && !ReferenceEquals(viewModel.SelectedGroup, group))
+        if (sender is ListBoxItem { DataContext: SidebarEntryViewModel group }
+            && !ReferenceEquals(viewModel.SelectedNavigationEntry, group))
         {
-            viewModel.SelectedGroup = group;
+            viewModel.SelectedNavigationEntry = group;
         }
     }
 
@@ -498,6 +508,12 @@ public partial class MainWindow : Window
     /// <param name="eventArgs">菜单打开参数。</param>
     private void Group_ContextMenuOpening(object sender, ContextMenuEventArgs eventArgs)
     {
+        if (sender is FrameworkElement { DataContext: SteamSidebarEntryViewModel })
+        {
+            eventArgs.Handled = true;
+            return;
+        }
+
         if (sender is not Border { ContextMenu: { } menu })
         {
             return;
@@ -797,6 +813,13 @@ public partial class MainWindow : Window
     /// <param name="eventArgs">拖放事件参数。</param>
     private void Group_DragEnter(object sender, DragEventArgs eventArgs)
     {
+        if (sender is FrameworkElement { DataContext: SteamSidebarEntryViewModel })
+        {
+            eventArgs.Effects = DragDropEffects.None;
+            eventArgs.Handled = true;
+            return;
+        }
+
         eventArgs.Effects = eventArgs.Data.GetDataPresent(ItemDragFormat)
             ? DragDropEffects.Move
             : HasExternalTargets(eventArgs.Data) ? DragDropEffects.Copy : DragDropEffects.None;
@@ -812,6 +835,8 @@ public partial class MainWindow : Window
     {
         if (sender is not FrameworkElement { Tag: LauncherGroupViewModel group })
         {
+            eventArgs.Effects = DragDropEffects.None;
+            eventArgs.Handled = true;
             return;
         }
 
@@ -825,6 +850,39 @@ public partial class MainWindow : Window
         }
 
         eventArgs.Handled = true;
+    }
+
+    /// <summary>
+    /// 刷新 Steam 标签行对应的账号列表。
+    /// </summary>
+    private async void SteamRefresh_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        eventArgs.Handled = true;
+        await viewModel.SteamAccounts.RefreshAsync();
+    }
+
+    /// <summary>使用当前主题编辑账号备注，取消返回空引用，空文本用于清除备注。</summary>
+    internal string? EditSteamAccountNote(string initialValue)
+    {
+        var settings = viewModel.Configuration.Settings;
+        var dialog = new TextInputDialog("账号备注", "备注（留空可清除）", initialValue,
+            themeService, settings.Theme, settings.WindowMaterial, allowEmpty: true)
+        {
+            Owner = this
+        };
+        return dialog.ShowDialog() == true ? dialog.Value : null;
+    }
+
+    /// <summary>
+    /// 隐藏时停止账号读取，重新显示 Steam 分组时刷新本机账号状态。
+    /// </summary>
+    private void HandleVisibilityChanged(object sender, DependencyPropertyChangedEventArgs eventArgs)
+    {
+        viewModel.SteamAccounts.SetActive(IsVisible && viewModel.IsSteamGroupSelected);
+        if (IsVisible && viewModel.IsSteamGroupSelected)
+        {
+            _ = viewModel.SteamAccounts.RefreshAsync();
+        }
     }
 
     /// <summary>

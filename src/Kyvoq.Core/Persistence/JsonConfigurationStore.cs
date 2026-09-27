@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Kyvoq.Core.Models;
+using Kyvoq.Core.Services;
 
 namespace Kyvoq.Core.Persistence;
 
@@ -78,6 +79,7 @@ public sealed class JsonConfigurationStore : IConfigurationStore, IDisposable
             }
             catch (Exception exception) when (IsRecoverableReadError(exception))
             {
+                DiagnosticLog.Current.Write("Configuration.LoadFailed", "主配置读取失败，尝试备份。", exception);
                 if (File.Exists(BackupPath))
                 {
                     try
@@ -90,6 +92,7 @@ public sealed class JsonConfigurationStore : IConfigurationStore, IDisposable
                     }
                     catch (Exception backupException) when (IsRecoverableReadError(backupException))
                     {
+                        DiagnosticLog.Current.Write("Configuration.BackupLoadFailed", "备份读取失败。", backupException);
                     }
                 }
 
@@ -140,6 +143,8 @@ public sealed class JsonConfigurationStore : IConfigurationStore, IDisposable
                 {
                     File.Move(temporaryPath, ConfigurationPath, overwrite: true);
                 }
+
+                DiagnosticLog.Current.Write("Configuration.Saved", "配置已原子保存。");
             }
             finally
             {
@@ -148,6 +153,11 @@ public sealed class JsonConfigurationStore : IConfigurationStore, IDisposable
                     File.Delete(temporaryPath);
                 }
             }
+        }
+        catch (Exception exception) when (exception is not OperationCanceledException)
+        {
+            DiagnosticLog.Current.Write("Configuration.SaveFailed", "配置保存失败。", exception);
+            throw;
         }
         finally
         {

@@ -12,6 +12,76 @@ namespace Kyvoq.App.Tests.ViewModels;
 public sealed class MainViewModelTests
 {
     /// <summary>
+    /// 验证 Steam 只存在于导航集合，开关及普通分组变更不会污染配置或改变身份。
+    /// </summary>
+    [Fact]
+    public async Task SteamNavigation_ShouldRemainTransientAndRestoreLauncherSelection()
+    {
+        var configuration = LauncherConfiguration.CreateDefault();
+        var service = new EmptySteamService();
+        using var model = new MainViewModel(configuration, new StubConfigurationStore(),
+            new IconCacheService(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"))), service, new FakeSteamAccountNoteStore());
+        Assert.Single(model.NavigationEntries);
+        Assert.Equal(0, service.ReadCount);
+        var settings = configuration.Settings.Clone();
+        settings.SteamGroupEnabled = true;
+        model.UpdateSettings(settings);
+        model.UpdateSettings(settings);
+        var steam = Assert.Single(model.NavigationEntries.OfType<SteamSidebarEntryViewModel>());
+        var ordinary = model.AddGroup("Steam");
+        Assert.Same(steam, model.NavigationEntries.Last());
+        Assert.Equal(2, configuration.Groups.Count);
+        model.SelectedNavigationEntry = steam;
+        await model.SteamAccounts.PendingRefresh;
+        Assert.Null(model.SelectedGroup);
+        Assert.False(model.CanAddItem);
+        Assert.Empty(model.VisibleItems);
+        Assert.Equal(1, service.ReadCount);
+
+        settings.SteamGroupEnabled = false;
+        model.UpdateSettings(settings);
+        Assert.Same(ordinary, model.SelectedGroup);
+        Assert.Equal(2, model.NavigationEntries.Count);
+        Assert.Equal(2, configuration.Clone().Groups.Count);
+        settings.SteamGroupEnabled = true;
+        model.UpdateSettings(settings);
+        model.MoveGroup(ordinary.Id, -1);
+        Assert.Same(ordinary, model.NavigationEntries[0]);
+        Assert.Same(steam, model.NavigationEntries.Last());
+        var removed = model.RemoveGroup(ordinary.Id);
+        model.RestoreGroup(removed);
+        Assert.Same(steam, model.NavigationEntries.Last());
+
+        await model.ReplaceConfigurationAsync(LauncherConfiguration.CreateDefault());
+        Assert.Single(model.NavigationEntries);
+        Assert.False(model.IsSteamGroupSelected);
+        Assert.True(model.CanAddItem);
+    }
+
+    /// <summary>
+    /// 为导航测试提供无账号的本地服务替身。
+    /// </summary>
+    private sealed class EmptySteamService : ISteamAccountService
+    {
+        public int ReadCount { get; private set; }
+        /// <summary>记录面板读取。</summary>
+        public Task<SteamAccountSnapshot> GetSnapshotAsync(CancellationToken cancellationToken = default)
+        {
+            ReadCount++;
+            return Task.FromResult(new SteamAccountSnapshot(true, []));
+        }
+        /// <summary>拒绝导航测试中的意外切换。</summary>
+        public Task<SteamOperationResult> SwitchAccountAsync(ulong id, IProgress<string>? progress = null, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("导航测试不应切换 Steam。");
+        /// <summary>拒绝导航测试中的意外登录。</summary>
+        public Task<SteamOperationResult> LoginAnotherAccountAsync(IProgress<string>? progress = null, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("导航测试不应启动 Steam。");
+        /// <summary>拒绝导航测试中的意外删除。</summary>
+        public Task<SteamOperationResult> DeleteAccountAsync(ulong id, IProgress<string>? progress = null, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("导航测试不应删除账号。");
+    }
+
+    /// <summary>
     /// 验证移动、重排和恢复单个项目时保留未受影响及被移动视图模型的身份与冲突状态。
     /// </summary>
     [Fact]

@@ -43,7 +43,11 @@ public sealed class JsonConfigurationStoreTests : IDisposable
         var cancellationToken = TestContext.Current.CancellationToken;
         using var store = new JsonConfigurationStore(temporaryDirectory);
         var initial = await store.LoadAsync(cancellationToken);
+        Assert.False(initial.Configuration.Settings.DiagnosticLoggingEnabled);
+        Assert.False(initial.Configuration.Settings.SteamGroupEnabled);
         initial.Configuration.Settings.WindowMaterial = WindowMaterial.MicaAlt;
+        initial.Configuration.Settings.DiagnosticLoggingEnabled = true;
+        initial.Configuration.Settings.SteamGroupEnabled = true;
         initial.Configuration.Groups[0].Items.Add(new LauncherItem
         {
             Name = "记事本",
@@ -56,6 +60,10 @@ public sealed class JsonConfigurationStoreTests : IDisposable
         Assert.Equal(ConfigurationLoadState.CreatedDefault, initial.State);
         Assert.Equal(ConfigurationLoadState.Loaded, reloaded.State);
         Assert.Equal(WindowMaterial.MicaAlt, reloaded.Configuration.Settings.WindowMaterial);
+        Assert.True(reloaded.Configuration.Settings.DiagnosticLoggingEnabled);
+        Assert.True(reloaded.Configuration.Clone().Settings.DiagnosticLoggingEnabled);
+        Assert.True(reloaded.Configuration.Settings.SteamGroupEnabled);
+        Assert.True(reloaded.Configuration.Clone().Settings.SteamGroupEnabled);
         Assert.Equal("记事本", Assert.Single(reloaded.Configuration.Groups[0].Items).Name);
     }
 

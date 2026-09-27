@@ -19,6 +19,10 @@ public sealed class AppSettings
 
     public bool ItemHotkeysEnabled { get; set; } = true;
 
+    public bool DiagnosticLoggingEnabled { get; set; }
+
+    public bool SteamGroupEnabled { get; set; }
+
     public double WindowWidth { get; set; } = 920;
 
     public double WindowHeight { get; set; } = 620;
@@ -42,6 +46,8 @@ public sealed class AppSettings
         CustomAccentArgb = CustomAccentArgb,
         StartWithWindows = StartWithWindows,
         ItemHotkeysEnabled = ItemHotkeysEnabled,
+        DiagnosticLoggingEnabled = DiagnosticLoggingEnabled,
+        SteamGroupEnabled = SteamGroupEnabled,
         WindowWidth = WindowWidth,
         WindowHeight = WindowHeight,
         WindowLeft = WindowLeft,

@@ -110,6 +110,94 @@ public sealed class GlobalHotkeyServiceTests
     }
 
     /// <summary>
+    /// 验证后台启动后桌面可直接触发全部快捷键，进入全屏时暂停，返回桌面后无需点击或重新注册。
+    /// </summary>
+    [Fact]
+    public void WindowMessage_ShouldResumeAllHotkeysWhenReturningToDesktop()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var bounds = new ScreenRectangle(0, 0, 1920, 1080);
+                var snapshot = new FullscreenWindowSnapshot(
+                    @"C:\Windows\explorer.exe", true, false, false, false, false, false,
+                    bounds, bounds, "WorkerW");
+                var detector = new WindowsFullscreenDetector(() => snapshot, () => true);
+                var window = new Window();
+                try
+                {
+                    var registrations = 0;
+                    using var service = new GlobalHotkeyService(
+                        window,
+                        detector,
+                        (_, _, _, _) =>
+                        {
+                            registrations++;
+                            return true;
+                        },
+                        (_, _) => true);
+                    var item = new LauncherItem
+                    {
+                        Name = "A",
+                        Target = @"C:\A.exe",
+                        Hotkey = new HotkeyGesture
+                        {
+                            Modifiers = HotkeyModifiers.Control | HotkeyModifiers.Alt,
+                            VirtualKey = 0x71
+                        }
+                    };
+                    var report = service.Apply(new AppSettings(), [item]);
+                    Assert.True(report.MainWindowRegistered);
+                    Assert.Empty(report.ConflictingItemIds);
+                    var invokedActions = new List<Guid>();
+                    service.Invoked += (_, actionId) => invokedActions.Add(actionId);
+                    var handle = new WindowInteropHelper(window).Handle;
+
+                    _ = SendMessage(handle, WmHotkey, new IntPtr(FirstRegistrationId), IntPtr.Zero);
+                    _ = SendMessage(handle, WmHotkey, new IntPtr(FirstRegistrationId + 1), IntPtr.Zero);
+                    Assert.Equal([GlobalHotkeyService.MainWindowActionId, item.Id], invokedActions);
+
+                    snapshot = snapshot with
+                    {
+                        ExecutablePath = @"C:\Games\Game.exe",
+                        WindowClassName = "GameWindow"
+                    };
+                    invokedActions.Clear();
+                    _ = SendMessage(handle, WmHotkey, new IntPtr(FirstRegistrationId), IntPtr.Zero);
+                    _ = SendMessage(handle, WmHotkey, new IntPtr(FirstRegistrationId + 1), IntPtr.Zero);
+                    Assert.Empty(invokedActions);
+
+                    snapshot = snapshot with
+                    {
+                        ExecutablePath = @"C:\Windows\explorer.exe",
+                        WindowClassName = "WorkerW"
+                    };
+                    _ = SendMessage(handle, WmHotkey, new IntPtr(FirstRegistrationId), IntPtr.Zero);
+                    _ = SendMessage(handle, WmHotkey, new IntPtr(FirstRegistrationId + 1), IntPtr.Zero);
+                    Assert.Equal([GlobalHotkeyService.MainWindowActionId, item.Id], invokedActions);
+                    Assert.Equal(2, registrations);
+                    Assert.False(window.IsVisible);
+                }
+                finally
+                {
+                    window.Close();
+                }
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        Assert.True(thread.Join(TimeSpan.FromSeconds(10)));
+
+        Assert.Null(failure);
+    }
+
+    /// <summary>
     /// 验证重复应用相同热键不调用 Win32，单项变化时仅更新对应注册。
     /// </summary>
     [Fact]

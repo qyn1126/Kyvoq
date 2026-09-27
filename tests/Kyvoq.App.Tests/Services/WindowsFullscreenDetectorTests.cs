@@ -79,6 +79,54 @@ public sealed class WindowsFullscreenDetectorTests
     }
 
     /// <summary>
+    /// 验证登录或退出游戏后，即使 Shell 窗口覆盖显示器且系统仍报告独占全屏也放行快捷键。
+    /// </summary>
+    /// <param name="windowClassName">不一定等于桌面或 Shell 主句柄的窗口类名。</param>
+    [Theory]
+    [InlineData("Progman")]
+    [InlineData("WorkerW")]
+    [InlineData("workerw")]
+    [InlineData("Shell_TrayWnd")]
+    [InlineData("Shell_SecondaryTrayWnd")]
+    public void IsForegroundFullscreen_ShouldIgnoreShellWindows(string windowClassName)
+    {
+        var snapshot = CreateSnapshot(
+            executablePath: null,
+            windowClassName: windowClassName);
+        var notificationQueries = 0;
+        var detector = new WindowsFullscreenDetector(
+            () => snapshot,
+            () =>
+            {
+                notificationQueries++;
+                return true;
+            });
+
+        Assert.False(detector.IsForegroundFullscreen());
+        Assert.Equal(0, notificationQueries);
+    }
+
+    /// <summary>
+    /// 验证排除 Shell 窗口时不影响资源管理器或类名未知的真正全屏窗口。
+    /// </summary>
+    /// <param name="executablePath">前台窗口所属程序。</param>
+    /// <param name="windowClassName">前台窗口类名。</param>
+    [Theory]
+    [InlineData(@"C:\Windows\explorer.exe", "CabinetWClass")]
+    [InlineData(@"C:\Games\Game.exe", "GameWindow")]
+    [InlineData(@"C:\Games\Game.exe", null)]
+    public void IsForegroundFullscreen_ShouldStillDetectOtherFullscreenWindows(
+        string executablePath,
+        string? windowClassName)
+    {
+        var detector = CreateDetector(CreateSnapshot(
+            executablePath: executablePath,
+            windowClassName: windowClassName));
+
+        Assert.True(detector.IsForegroundFullscreen());
+    }
+
+    /// <summary>
     /// 验证不可交互、系统或 Kyvoq 自身窗口不会触发全屏抑制。
     /// </summary>
     [Theory]
@@ -203,6 +251,7 @@ public sealed class WindowsFullscreenDetectorTests
     /// <param name="isFramedMaximized">是否为普通带边框最大化窗口。</param>
     /// <param name="windowBounds">窗口屏幕边界。</param>
     /// <param name="monitorBounds">显示器屏幕边界。</param>
+    /// <param name="windowClassName">前台窗口类名。</param>
     /// <returns>用于检测规则测试的快照。</returns>
     private static FullscreenWindowSnapshot CreateSnapshot(
         string? executablePath = @"C:\Games\Game.exe",
@@ -213,7 +262,8 @@ public sealed class WindowsFullscreenDetectorTests
         bool isCurrentProcess = false,
         bool isFramedMaximized = false,
         ScreenRectangle? windowBounds = null,
-        ScreenRectangle? monitorBounds = null) =>
+        ScreenRectangle? monitorBounds = null,
+        string? windowClassName = null) =>
         new(
             executablePath,
             isVisible,
@@ -223,5 +273,6 @@ public sealed class WindowsFullscreenDetectorTests
             isCurrentProcess,
             isFramedMaximized,
             windowBounds ?? new ScreenRectangle(0, 0, 1920, 1080),
-            monitorBounds ?? new ScreenRectangle(0, 0, 1920, 1080));
+            monitorBounds ?? new ScreenRectangle(0, 0, 1920, 1080),
+            windowClassName);
 }

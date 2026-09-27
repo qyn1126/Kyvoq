@@ -76,6 +76,7 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
         source = HwndSource.FromHwnd(windowHandle)
             ?? throw new InvalidOperationException("无法创建全局快捷键消息源。");
         source.AddHook(WindowProcedure);
+        DiagnosticLog.Current.Write("Hotkey.Initialized", $"Window=0x{windowHandle.ToInt64():X}");
     }
 
     /// <summary>
@@ -158,7 +159,30 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
             }
         }
 
+        DiagnosticLog.Current.Write("Hotkey.Apply",
+            $"MainWindowRegistered={mainWindowRegistered}; ItemHotkeysEnabled={settings.ItemHotkeysEnabled}; "
+            + $"Configured={configuredGestures.Count}; Registered={registeredGestures.Count}; Conflicts={string.Join(",", conflicts)}");
         return new HotkeyRegistrationReport(mainWindowRegistered, conflicts);
+    }
+
+    /// <summary>
+    /// 记录当前配置及实际注册状态，使运行途中开启的日志也包含快捷键上下文。
+    /// </summary>
+    public void WriteDiagnostics()
+    {
+        if (!DiagnosticLog.Current.IsEnabled)
+        {
+            return;
+        }
+
+        foreach (var (actionId, gesture) in configuredGestures)
+        {
+            DiagnosticLog.Current.Write("Hotkey.State",
+                $"Action={actionId}; Gesture={gesture}; Registered={registeredGestures.ContainsKey(actionId)}; "
+                + $"RegistrationId={registrationsByAction.GetValueOrDefault(actionId)}; Window=0x{windowHandle.ToInt64():X}");
+        }
+
+        _ = fullscreenDetector.IsForegroundFullscreen();
     }
 
     /// <summary>
@@ -194,6 +218,9 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
             TemporaryRegistrationId,
             (uint)gesture.Modifiers | ModNoRepeat,
             gesture.VirtualKey);
+        var nativeError = registered ? 0 : Marshal.GetLastPInvokeError();
+        DiagnosticLog.Current.Write("Hotkey.Availability",
+            $"Gesture={gesture}; Available={registered}; Win32Error={nativeError}");
         if (registered)
         {
             unregisterHotKey(windowHandle, TemporaryRegistrationId);
@@ -232,11 +259,15 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
         }
 
         var registrationId = GetOrCreateRegistrationId(actionId);
-        if (!registerHotKey(
-                windowHandle,
-                registrationId,
-                (uint)gesture.Modifiers | ModNoRepeat,
-                gesture.VirtualKey))
+        var registered = registerHotKey(
+            windowHandle,
+            registrationId,
+            (uint)gesture.Modifiers | ModNoRepeat,
+            gesture.VirtualKey);
+        var nativeError = registered ? 0 : Marshal.GetLastPInvokeError();
+        DiagnosticLog.Current.Write("Hotkey.Register",
+            $"Action={actionId}; Id={registrationId}; Gesture={gesture}; Success={registered}; Win32Error={nativeError}");
+        if (!registered)
         {
             return false;
         }
@@ -283,7 +314,10 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
             return;
         }
 
-        unregisterHotKey(windowHandle, registrationId);
+        var unregistered = unregisterHotKey(windowHandle, registrationId);
+        var nativeError = unregistered ? 0 : Marshal.GetLastPInvokeError();
+        DiagnosticLog.Current.Write("Hotkey.Unregister",
+            $"Action={actionId}; Id={registrationId}; Success={unregistered}; Win32Error={nativeError}");
         actionsByRegistration.Remove(registrationId);
     }
 
@@ -307,7 +341,10 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
     {
         foreach (var registrationId in actionsByRegistration.Keys)
         {
-            unregisterHotKey(windowHandle, registrationId);
+            var unregistered = unregisterHotKey(windowHandle, registrationId);
+            var nativeError = unregistered ? 0 : Marshal.GetLastPInvokeError();
+            DiagnosticLog.Current.Write("Hotkey.Unregister",
+                $"Id={registrationId}; Success={unregistered}; Win32Error={nativeError}");
         }
 
         actionsByRegistration.Clear();
@@ -332,14 +369,25 @@ public sealed class GlobalHotkeyService : IGlobalHotkeyService
         IntPtr longParameter,
         ref bool handled)
     {
-        if (message == WmHotkey
-            && actionsByRegistration.TryGetValue(wordParameter.ToInt32(), out var actionId))
+        if (message == WmHotkey)
         {
-            handled = true;
-            if (!fullscreenDetector.IsForegroundFullscreen())
+            DiagnosticLog.Current.Write("Hotkey.Message",
+                $"Id={wordParameter.ToInt64()}; KeyData=0x{longParameter.ToInt64():X}; Window=0x{handle.ToInt64():X}");
+            if (!actionsByRegistration.TryGetValue(wordParameter.ToInt32(), out var actionId))
             {
-                Invoked?.Invoke(this, actionId);
+                DiagnosticLog.Current.Write("Hotkey.UnknownRegistration", $"Id={wordParameter.ToInt64()}");
+                return IntPtr.Zero;
             }
+
+            handled = true;
+            if (fullscreenDetector.IsForegroundFullscreen())
+            {
+                DiagnosticLog.Current.Write("Hotkey.Suppressed", $"Action={actionId}; Reason=Fullscreen");
+                return IntPtr.Zero;
+            }
+
+            DiagnosticLog.Current.Write("Hotkey.Invoked", $"Action={actionId}");
+            Invoked?.Invoke(this, actionId);
         }
 
         return IntPtr.Zero;

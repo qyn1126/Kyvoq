@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="clr-namespace:Kyvoq.App.Controls"
+        xmlns:views="clr-namespace:Kyvoq.App.Views"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
         Title="Kyvoq"
@@ -85,13 +86,38 @@
                         <ui:MenuItem Header="删除分组" Icon="{ui:SymbolIcon Delete24}" CommandParameter="{Binding}" Click="DeleteGroup_Click" />
                     </ContextMenu>
                 </Border.ContextMenu>
-                <TextBlock HorizontalAlignment="Stretch"
-                           VerticalAlignment="Center"
-                           FontSize="14"
-                           FontWeight="SemiBold"
-                           Text="{Binding Name}"
-                           TextAlignment="Center"
-                           ToolTip="{Binding Name}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock HorizontalAlignment="Stretch"
+                               VerticalAlignment="Center"
+                               FontSize="14" FontWeight="SemiBold"
+                               Text="{Binding Name}" TextAlignment="Center"
+                               TextTrimming="CharacterEllipsis" ToolTip="{Binding Name}" />
+                    <Button x:Name="SteamRefreshButton" Grid.Column="1" Width="24" Height="24"
+                            MinWidth="0" Padding="0" Margin="3,0,0,0"
+                            ToolTip="刷新 Steam 账号" AutomationProperties.Name="刷新 Steam 账号"
+                            IsEnabled="{Binding DataContext.SteamAccounts.CanRefresh, RelativeSource={RelativeSource AncestorType=Window}}"
+                            Click="SteamRefresh_Click">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource IconButtonStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <MultiDataTrigger>
+                                        <MultiDataTrigger.Conditions>
+                                            <Condition Binding="{Binding IsSteam}" Value="True" />
+                                            <Condition Binding="{Binding DataContext.IsSteamGroupSelected, RelativeSource={RelativeSource AncestorType=Window}}" Value="True" />
+                                        </MultiDataTrigger.Conditions>
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </MultiDataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                        <TextBlock FontFamily="Segoe Fluent Icons" FontSize="14" Text="&#xE72C;" />
+                    </Button>
+                </Grid>
             </Border>
         </DataTemplate>
         <DataTemplate x:Key="CompactItemTemplate">
@@ -150,9 +176,9 @@
                     <ListBox x:Name="GroupsListBox"
                              Grid.Row="0"
                              Margin="12,10,10,0"
-                             ItemsSource="{Binding Groups}"
+                             ItemsSource="{Binding NavigationEntries}"
                              ItemTemplate="{StaticResource GroupTemplate}"
-                             SelectedItem="{Binding SelectedGroup}"
+                             SelectedItem="{Binding SelectedNavigationEntry}"
                              Background="Transparent"
                              BorderThickness="0"
                              FocusVisualStyle="{x:Null}"
@@ -256,7 +282,7 @@
                             <ContextMenu MinWidth="180">
                                 <ui:MenuItem Header="导入配置…" Icon="{ui:SymbolIcon ArrowDownload24}" Click="ImportConfiguration_Click" />
                                 <ui:MenuItem Header="导出配置…" Icon="{ui:SymbolIcon ArrowUpload24}" Click="ExportConfiguration_Click" />
-                                <ui:MenuItem Header="添加项目…" Icon="{ui:SymbolIcon Add24}" Click="AddItem_Click" />
+                                <ui:MenuItem Header="添加项目…" Icon="{ui:SymbolIcon Add24}" IsEnabled="{Binding CanAddItem}" Click="AddItem_Click" />
                                 <Separator />
                                 <ui:MenuItem Header="打开数据目录" Icon="{ui:SymbolIcon FolderOpen24}" Click="OpenDataDirectory_Click" />
                                 <ui:MenuItem Header="设置" Icon="{ui:SymbolIcon Settings24}" Click="Settings_Click" />
@@ -290,6 +316,15 @@
                              VirtualizingPanel.VirtualizationMode="Recycling"
                              DragEnter="ItemsListBox_DragEnter"
                              Drop="ItemsListBox_Drop">
+                        <ListBox.Style>
+                            <Style TargetType="ListBox" BasedOn="{StaticResource {x:Type ListBox}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSteamGroupSelected}" Value="True">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.Style>
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="Margin" Value="0,0,1,1" />
@@ -405,6 +440,19 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                    <Grid x:Name="SteamAccountsHost">
+                        <Grid.Style>
+                            <Style TargetType="Grid">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsSteamGroupSelected}" Value="True">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Grid.Style>
+                        <views:SteamAccountsView DataContext="{Binding SteamAccounts}" />
+                    </Grid>
                 </Grid>
             </Grid>
 

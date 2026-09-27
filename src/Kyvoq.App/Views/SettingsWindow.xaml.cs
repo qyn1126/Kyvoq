@@ -1,8 +1,11 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Kyvoq.App.Services;
 using Kyvoq.Core.Models;
+using Kyvoq.Core.Services;
 using Wpf.Ui.Controls;
 using Forms = System.Windows.Forms;
 
@@ -50,6 +53,11 @@ public partial class SettingsWindow : FluentWindow
         MainWindowHotkeyInput.SetGesture(sourceSettings.MainWindowHotkey);
         ItemHotkeysEnabledCheckBox.IsChecked = sourceSettings.ItemHotkeysEnabled;
         StartWithWindowsCheckBox.IsChecked = sourceSettings.StartWithWindows;
+        DiagnosticLoggingEnabledCheckBox.IsChecked = sourceSettings.DiagnosticLoggingEnabled;
+        SteamGroupEnabledCheckBox.IsChecked = sourceSettings.SteamGroupEnabled;
+        LogStatusText.Text = DiagnosticLog.Current.LastError is null
+            ? "日志缓存满 5 分钟、达到 1 MiB 或 2 分钟无新记录时写入；关闭日志或退出时也会写入。最多保留 5 个文件，每个约 5 MB。"
+            : $"日志写入失败：{DiagnosticLog.Current.LastError}";
         DataDirectoryText.Text = dataDirectory;
         SourceInitialized += HandleSourceInitialized;
     }
@@ -139,7 +147,31 @@ public partial class SettingsWindow : FluentWindow
         ResultSettings.MainWindowHotkey = gesture;
         ResultSettings.ItemHotkeysEnabled = ItemHotkeysEnabledCheckBox.IsChecked == true;
         ResultSettings.StartWithWindows = StartWithWindowsCheckBox.IsChecked == true;
+        ResultSettings.DiagnosticLoggingEnabled = DiagnosticLoggingEnabledCheckBox.IsChecked == true;
+        ResultSettings.SteamGroupEnabled = SteamGroupEnabledCheckBox.IsChecked == true;
         DialogResult = true;
+    }
+
+    /// <summary>
+    /// 打开诊断日志目录，便于复现问题后找到日志文件。
+    /// </summary>
+    /// <param name="sender">打开目录按钮。</param>
+    /// <param name="eventArgs">点击事件参数。</param>
+    private void OpenLogs_Click(object sender, RoutedEventArgs eventArgs)
+    {
+        try
+        {
+            Directory.CreateDirectory(DiagnosticLog.Current.DirectoryPath);
+            using var process = Process.Start(new ProcessStartInfo(DiagnosticLog.Current.DirectoryPath)
+            {
+                UseShellExecute = true
+            });
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or Win32Exception)
+        {
+            DiagnosticLog.Current.Write("Log.OpenDirectoryFailed", "无法打开日志目录。", exception);
+            LogStatusText.Text = $"无法打开日志目录：{exception.Message}";
+        }
     }
 
     /// <summary>

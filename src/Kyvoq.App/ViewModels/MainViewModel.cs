@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using Kyvoq.App.Services;
 using Kyvoq.Core.Models;
 using Kyvoq.Core.Persistence;
@@ -16,6 +17,9 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     private readonly object saveSync = new();
     private LauncherConfiguration configuration;
     private LauncherGroupViewModel? selectedGroup;
+    private SidebarEntryViewModel? selectedNavigationEntry;
+    private readonly SteamSidebarEntryViewModel steamEntry = new();
+    private Guid? lastLauncherGroupId;
     private CancellationTokenSource? pendingSave;
     private bool disposed;
 
@@ -29,25 +33,54 @@ public sealed class MainViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<LauncherGroupViewModel> Groups { get; } = [];
 
+    public ObservableCollection<SidebarEntryViewModel> NavigationEntries { get; } = [];
+
+    public SteamAccountsViewModel SteamAccounts { get; }
+
+    public bool IsSteamGroupSelected => SelectedNavigationEntry is SteamSidebarEntryViewModel;
+
+    public bool CanAddItem => SelectedGroup is not null;
+
     public RangeObservableCollection<LauncherItemViewModel> VisibleItems { get; } = [];
 
     public LauncherGroupViewModel? SelectedGroup
     {
         get => selectedGroup;
+        set => SelectedNavigationEntry = value;
+    }
+
+    public SidebarEntryViewModel? SelectedNavigationEntry
+    {
+        get => selectedNavigationEntry;
         set
         {
-            if (SetProperty(ref selectedGroup, value))
+            if (value is SteamSidebarEntryViewModel && !configuration.Settings.SteamGroupEnabled)
             {
+                return;
+            }
+
+            if (SetProperty(ref selectedNavigationEntry, value))
+            {
+                selectedGroup = value as LauncherGroupViewModel;
+                if (selectedGroup is not null)
+                {
+                    lastLauncherGroupId = selectedGroup.Id;
+                }
+
+                OnPropertyChanged(nameof(SelectedGroup));
+                OnPropertyChanged(nameof(IsSteamGroupSelected));
+                OnPropertyChanged(nameof(CanAddItem));
                 RefreshVisibleItems();
                 OnPropertyChanged(nameof(SelectedGroupTitle));
                 OnPropertyChanged(nameof(SelectedGroupSubtitle));
+                SteamAccounts.SetActive(IsSteamGroupSelected);
             }
         }
     }
 
-    public string SelectedGroupTitle => SelectedGroup?.Name ?? "启动项目";
+    public string SelectedGroupTitle => SelectedNavigationEntry?.Name ?? "启动项目";
 
-    public string SelectedGroupSubtitle => SelectedGroup is null
+    public string SelectedGroupSubtitle => IsSteamGroupSelected ? string.Empty : SelectedGroup is null
         ? "没有可用分组"
         : $"{SelectedGroup.ItemCount} 个项目";
 
@@ -57,15 +90,24 @@ public sealed class MainViewModel : ObservableObject, IDisposable
     /// <param name="configuration">当前用户配置。</param>
     /// <param name="configurationStore">配置持久化服务。</param>
     /// <param name="iconCache">图标缓存服务。</param>
+    /// <param name="steamAccountService">可注入的 Steam 账号服务。</param>
+    /// <param name="steamAccountNoteStore">独立的 Steam 备注存储。</param>
     public MainViewModel(
         LauncherConfiguration configuration,
         IConfigurationStore configurationStore,
-        IconCacheService iconCache)
+        IconCacheService iconCache,
+        ISteamAccountService? steamAccountService = null,
+        ISteamAccountNoteStore? steamAccountNoteStore = null)
     {
         this.configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         this.configurationStore = configurationStore ?? throw new ArgumentNullException(nameof(configurationStore));
         this.iconCache = iconCache ?? throw new ArgumentNullException(nameof(iconCache));
+        SteamAccounts = new SteamAccountsViewModel(steamAccountService ?? new SteamAccountService(),
+            steamAccountNoteStore ?? new JsonSteamAccountNoteStore(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Kyvoq")));
+        Groups.CollectionChanged += HandleGroupsChanged;
         ReloadGroups();
+        SyncSteamNavigation();
     }
 
     /// <summary>
@@ -313,6 +355,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         ObjectDisposedException.ThrowIf(disposed, this);
         configuration = ConfigurationValidator.ValidateAndNormalize(replacement);
         ReloadGroups();
+        SyncSteamNavigation();
         await configurationStore.SaveAsync(configuration.Clone());
         ConfigurationChanged?.Invoke(this, EventArgs.Empty);
         HotkeyConfigurationChanged?.Invoke(this, EventArgs.Empty);
@@ -329,6 +372,7 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         var hotkeysChanged = configuration.Settings.MainWindowHotkey != updatedSettings.MainWindowHotkey
             || configuration.Settings.ItemHotkeysEnabled != updatedSettings.ItemHotkeysEnabled;
         configuration.Settings = updatedSettings;
+        SyncSteamNavigation();
         NotifyConfigurationChanged(hotkeysChanged);
     }
 
@@ -430,11 +474,73 @@ public sealed class MainViewModel : ObservableObject, IDisposable
         }
 
         disposed = true;
+        Groups.CollectionChanged -= HandleGroupsChanged;
+        SteamAccounts.Dispose();
         lock (saveSync)
         {
             pendingSave?.Cancel();
             pendingSave?.Dispose();
             pendingSave = null;
+        }
+    }
+
+    /// <summary>
+    /// 将普通分组的增量变化投影到侧栏，Steam 条目始终保持在末尾。
+    /// </summary>
+    private void HandleGroupsChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
+    {
+        if (eventArgs.Action == NotifyCollectionChangedAction.Move)
+        {
+            NavigationEntries.Move(eventArgs.OldStartingIndex, eventArgs.NewStartingIndex);
+            return;
+        }
+
+        if (eventArgs.Action == NotifyCollectionChangedAction.Reset)
+        {
+            NavigationEntries.Clear();
+            SyncSteamNavigation();
+            return;
+        }
+
+        if (eventArgs.OldItems is not null)
+        {
+            foreach (LauncherGroupViewModel group in eventArgs.OldItems)
+            {
+                NavigationEntries.Remove(group);
+            }
+        }
+
+        if (eventArgs.NewItems is not null)
+        {
+            var index = eventArgs.NewStartingIndex;
+            foreach (LauncherGroupViewModel group in eventArgs.NewItems)
+            {
+                NavigationEntries.Insert(index++, group);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 根据设置增删运行时 Steam 入口，并在关闭时恢复普通分组选中状态。
+    /// </summary>
+    private void SyncSteamNavigation()
+    {
+        if (configuration.Settings.SteamGroupEnabled)
+        {
+            if (!NavigationEntries.Contains(steamEntry))
+            {
+                NavigationEntries.Add(steamEntry);
+            }
+        }
+        else
+        {
+            if (IsSteamGroupSelected)
+            {
+                SelectedGroup = Groups.FirstOrDefault(group => group.Id == lastLauncherGroupId) ?? Groups.FirstOrDefault();
+            }
+
+            NavigationEntries.Remove(steamEntry);
+            SteamAccounts.SetActive(false);
         }
     }
 

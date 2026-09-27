@@ -7,13 +7,13 @@ namespace Kyvoq.App.ViewModels;
 /// <summary>
 /// 为启动分组提供可观察项目集合。
 /// </summary>
-public sealed class LauncherGroupViewModel : ObservableObject
+public sealed class LauncherGroupViewModel : SidebarEntryViewModel
 {
     public LauncherGroup Model { get; }
 
     public Guid Id => Model.Id;
 
-    public string Name => Model.Name;
+    public override string Name => Model.Name;
 
     public int ItemCount => Items.Count;
 

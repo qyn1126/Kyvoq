@@ -28,6 +28,7 @@ public partial class App : Application
     private ILaunchService? launchService;
     private bool exiting;
     private bool mainWindowConflictNotified;
+    private bool? diagnosticLoggingEnabled;
 
     /// <summary>
     /// 初始化单实例通信、配置、窗口、托盘和全局快捷键。
@@ -44,6 +45,8 @@ public partial class App : Application
         }
 
         DispatcherUnhandledException += HandleDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException += HandleUnhandledException;
+        TaskScheduler.UnobservedTaskException += HandleUnobservedTaskException;
 
         singleInstanceService = new SingleInstanceService("Kyvoq.FastLauncher");
         if (!singleInstanceService.IsPrimaryInstance())
@@ -58,11 +61,18 @@ public partial class App : Application
             "Kyvoq");
         configurationStore = new JsonConfigurationStore(dataDirectory);
         var loadResult = await configurationStore.LoadAsync();
+        ApplyDiagnosticLogging(loadResult.Configuration.Settings);
+        DiagnosticLog.Current.Write("Application.Start",
+            $"Background={eventArgs.Args.Contains("--background", StringComparer.OrdinalIgnoreCase)}; "
+            + $"ConfigurationState={loadResult.State}; RecoveryMessage={loadResult.Message}");
         themeService = new ThemeService();
         themeService.ApplyApplicationTheme(loadResult.Configuration.Settings);
         SystemEvents.UserPreferenceChanged += HandleUserPreferenceChanged;
+        SystemEvents.SessionSwitch += HandleSessionSwitch;
+        SystemEvents.PowerModeChanged += HandlePowerModeChanged;
         iconCacheService = new IconCacheService(Path.Combine(dataDirectory, "IconCache"));
-        mainViewModel = new MainViewModel(loadResult.Configuration, configurationStore, iconCacheService);
+        mainViewModel = new MainViewModel(loadResult.Configuration, configurationStore, iconCacheService,
+            steamAccountNoteStore: new JsonSteamAccountNoteStore(dataDirectory));
         launchService = new LaunchService(new ElevatedLaunchBroker());
         startupService = new WindowsStartupService();
 
@@ -83,7 +93,10 @@ public partial class App : Application
         ApplySystemSettings(showErrors: false);
         RefreshHotkeys();
         singleInstanceService.StartListening(() =>
-            _ = Dispatcher.BeginInvoke(mainWindow.ShowAndActivate));
+        {
+            DiagnosticLog.Current.Write("Application.SecondInstance", "收到另一个实例的窗口激活请求。");
+            _ = Dispatcher.BeginInvoke(mainWindow.ShowAndActivate);
+        });
         _ = iconCacheService.TrimAsync();
 
         var startInBackground = eventArgs.Args.Any(
@@ -92,6 +105,9 @@ public partial class App : Application
         {
             mainWindow.ShowAndActivate();
         }
+
+        DiagnosticLog.Current.Write("Application.Ready",
+            $"Background={startInBackground}; MainWindowVisible={mainWindow.IsVisible}");
 
         if (loadResult.Message.Length > 0)
         {
@@ -113,12 +129,18 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs eventArgs)
     {
         DispatcherUnhandledException -= HandleDispatcherUnhandledException;
+        AppDomain.CurrentDomain.UnhandledException -= HandleUnhandledException;
+        TaskScheduler.UnobservedTaskException -= HandleUnobservedTaskException;
         SystemEvents.UserPreferenceChanged -= HandleUserPreferenceChanged;
+        SystemEvents.SessionSwitch -= HandleSessionSwitch;
+        SystemEvents.PowerModeChanged -= HandlePowerModeChanged;
         trayIconService?.Dispose();
         hotkeyService?.Dispose();
         mainViewModel?.Dispose();
         configurationStore?.Dispose();
         singleInstanceService?.Dispose();
+        DiagnosticLog.Current.Write("Application.Exit", $"ExitCode={eventArgs.ApplicationExitCode}");
+        DiagnosticLog.Current.Dispose();
         base.OnExit(eventArgs);
     }
 
@@ -139,6 +161,11 @@ public partial class App : Application
         mainWindow.SettingsChanged += (_, _) => HandleSettingsChanged();
         mainWindow.ExitRequested += async (_, _) => await ExitAsync();
         mainViewModel.HotkeyConfigurationChanged += (_, _) => RefreshHotkeys();
+        mainViewModel.ConfigurationChanged += (_, _) =>
+        {
+            ApplyDiagnosticLogging(mainViewModel.Configuration.Settings, showErrors: true);
+            DiagnosticLog.Current.Write("Configuration.Changed", "配置已更新，等待保存。");
+        };
         hotkeyService.Invoked += HandleHotkeyInvoked;
         trayIconService.ShowRequested += (_, _) => mainWindow.ShowAndActivate();
         trayIconService.ToggleHotkeysRequested += (_, _) => ToggleItemHotkeys();
@@ -152,6 +179,7 @@ public partial class App : Application
     /// <param name="actionId">项目标识；空标识表示呼出主界面。</param>
     private async void HandleHotkeyInvoked(object? sender, Guid actionId)
     {
+        DiagnosticLog.Current.Write("Application.HotkeyAction", $"Action={actionId}");
         if (actionId == GlobalHotkeyService.MainWindowActionId)
         {
             mainWindow?.ToggleVisibility();
@@ -161,6 +189,7 @@ public partial class App : Application
         var item = mainViewModel?.FindItem(actionId)?.Item.Model;
         if (item is null || launchService is null)
         {
+            DiagnosticLog.Current.Write("Application.HotkeyActionMissing", $"Action={actionId}; ItemFound={item is not null}");
             return;
         }
 
@@ -190,6 +219,7 @@ public partial class App : Application
             mainViewModel.Configuration.Settings,
             mainViewModel.GetAllItems().Select(item => item.Model));
         mainViewModel.SetHotkeyConflicts(report.ConflictingItemIds);
+        hotkeyService.WriteDiagnostics();
         if (!report.MainWindowRegistered && !mainWindowConflictNotified)
         {
             mainWindowConflictNotified = true;
@@ -211,6 +241,7 @@ public partial class App : Application
     /// </summary>
     private void HandleSettingsChanged()
     {
+        DiagnosticLog.Current.Write("Settings.Applied", "应用新的界面和系统设置。");
         if (themeService is not null && mainViewModel is not null)
         {
             themeService.ApplyApplicationTheme(mainViewModel.Configuration.Settings);
@@ -235,9 +266,11 @@ public partial class App : Application
         try
         {
             startupService?.SetEnabled(settings.StartWithWindows);
+            DiagnosticLog.Current.Write("StartupRegistration.Applied", $"Enabled={settings.StartWithWindows}");
         }
         catch (Exception exception) when (exception is UnauthorizedAccessException or InvalidOperationException)
         {
+            DiagnosticLog.Current.Write("StartupRegistration.Failed", $"Enabled={settings.StartWithWindows}", exception);
             if (showErrors)
             {
                 MessageBox.Show(
@@ -278,17 +311,21 @@ public partial class App : Application
         }
 
         exiting = true;
+        DiagnosticLog.Current.Write("Application.ExitRequested", "开始保存配置并关闭窗口。");
         searchWindow?.ClosePermanently();
         mainWindow?.ClosePermanently();
         try
         {
             if (mainViewModel is not null)
             {
+                mainViewModel.SteamAccounts.SetActive(false);
+                await mainViewModel.SteamAccounts.PendingOperation;
                 await mainViewModel.FlushSaveAsync();
             }
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException)
         {
+            DiagnosticLog.Current.Write("Application.ExitSaveFailed", "退出前保存配置失败。", exception);
             MessageBox.Show(
                 mainWindow,
                 $"退出前保存配置失败：{exception.Message}",
@@ -343,6 +380,7 @@ public partial class App : Application
         object sender,
         DispatcherUnhandledExceptionEventArgs eventArgs)
     {
+        DiagnosticLog.Current.Write("Exception.Dispatcher", "界面线程出现未处理异常。", eventArgs.Exception);
         MessageBox.Show(
             mainWindow,
             $"Kyvoq 遇到未预期错误：{eventArgs.Exception.Message}",
@@ -352,4 +390,73 @@ public partial class App : Application
         eventArgs.Handled = true;
         _ = ExitAsync();
     }
+
+    /// <summary>
+    /// 在启动、保存设置或导入配置时立即同步日志开关。
+    /// </summary>
+    /// <param name="settings">当前应用设置。</param>
+    /// <param name="showErrors">用户修改设置时是否显示日志启用失败信息。</param>
+    private void ApplyDiagnosticLogging(AppSettings settings, bool showErrors = false)
+    {
+        if (diagnosticLoggingEnabled == settings.DiagnosticLoggingEnabled)
+        {
+            return;
+        }
+
+        diagnosticLoggingEnabled = settings.DiagnosticLoggingEnabled;
+        if (!DiagnosticLog.Current.SetEnabled(settings.DiagnosticLoggingEnabled))
+        {
+            if (showErrors)
+            {
+                MessageBox.Show(
+                    $"无法开启诊断日志：{DiagnosticLog.Current.LastError}",
+                    "Kyvoq 日志", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            return;
+        }
+
+        DiagnosticLog.Current.Write("Settings.Diagnostics",
+            $"MainWindowHotkey={settings.MainWindowHotkey}; ItemHotkeysEnabled={settings.ItemHotkeysEnabled}; "
+            + $"StartWithWindows={settings.StartWithWindows}");
+        hotkeyService?.WriteDiagnostics();
+    }
+
+    /// <summary>
+    /// 记录无法由界面线程处理的进程异常，并在终止前刷新日志。
+    /// </summary>
+    /// <param name="sender">异常源。</param>
+    /// <param name="eventArgs">进程异常信息。</param>
+    private void HandleUnhandledException(object sender, UnhandledExceptionEventArgs eventArgs)
+    {
+        DiagnosticLog.Current.Write("Exception.Unhandled",
+            $"Terminating={eventArgs.IsTerminating}", eventArgs.ExceptionObject as Exception);
+        if (eventArgs.IsTerminating)
+        {
+            DiagnosticLog.Current.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// 记录后台任务未被观察的异常，不改变运行时原有处理行为。
+    /// </summary>
+    /// <param name="sender">任务异常源。</param>
+    /// <param name="eventArgs">任务异常信息。</param>
+    private void HandleUnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs eventArgs) =>
+        DiagnosticLog.Current.Write("Exception.UnobservedTask", "后台任务异常。", eventArgs.Exception);
+
+    /// <summary>
+    /// 记录登录、注销及锁定变化，供启动和恢复问题排查使用。
+    /// </summary>
+    /// <param name="sender">系统事件源。</param>
+    /// <param name="eventArgs">会话变化信息。</param>
+    private void HandleSessionSwitch(object sender, SessionSwitchEventArgs eventArgs) =>
+        DiagnosticLog.Current.Write("System.SessionSwitch", $"Reason={eventArgs.Reason}");
+
+    /// <summary>
+    /// 记录系统挂起和恢复事件。
+    /// </summary>
+    /// <param name="sender">系统事件源。</param>
+    /// <param name="eventArgs">电源状态信息。</param>
+    private void HandlePowerModeChanged(object sender, PowerModeChangedEventArgs eventArgs) =>
+        DiagnosticLog.Current.Write("System.PowerModeChanged", $"Mode={eventArgs.Mode}");
 }

@@ -154,6 +154,15 @@
                                   Margin="0,8,0,0"
                                   FontWeight="SemiBold"
                                   Content="登录 Windows 后自动启动 Kyvoq" />
+                        <CheckBox x:Name="SteamGroupEnabledCheckBox"
+                                  Margin="0,8,0,0"
+                                  FontWeight="SemiBold"
+                                  Content="启用 Steam 分组" />
+                        <TextBlock Margin="0,4,0,0"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Text="管理本机 Steam 账号及备注。双击账号或加号后确认登录；右键可备注或删除。登录会重启 Steam，删除会退出 Steam。" />
                     </StackPanel>
                 </Border>
 
@@ -164,7 +173,24 @@
                         BorderThickness="1"
                         CornerRadius="10">
                     <StackPanel>
-                        <TextBlock FontWeight="SemiBold" Text="数据目录" />
+                        <CheckBox x:Name="DiagnosticLoggingEnabledCheckBox"
+                                  FontWeight="SemiBold"
+                                  Content="启用完整诊断日志" />
+                        <TextBlock Margin="0,4,0,10"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap"
+                                   Text="记录启动、快捷键、全屏判断和异常，便于排查问题。保存后生效，重启后保持。" />
+                        <Button HorizontalAlignment="Left"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Content="打开日志文件夹"
+                                Click="OpenLogs_Click" />
+                        <TextBlock x:Name="LogStatusText"
+                                   Margin="0,6,0,0"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="12"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Margin="0,12,0,0" FontWeight="SemiBold" Text="数据目录" />
                         <TextBlock x:Name="DataDirectoryText"
                                    Margin="0,4,0,0"
                                    Foreground="{DynamicResource TextSecondaryBrush}"

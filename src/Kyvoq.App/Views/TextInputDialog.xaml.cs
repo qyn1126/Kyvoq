@@ -14,6 +14,7 @@ public partial class TextInputDialog : FluentWindow
     private readonly ThemeService themeService;
     private readonly AppTheme theme;
     private readonly WindowMaterial material;
+    private readonly bool allowEmpty;
 
     public string Value => ValueTextBox.Text.Trim();
 
@@ -26,18 +27,21 @@ public partial class TextInputDialog : FluentWindow
     /// <param name="themeService">主题服务。</param>
     /// <param name="theme">当前主题。</param>
     /// <param name="material">当前窗口材质。</param>
+    /// <param name="allowEmpty">是否允许通过空文本清除现有内容。</param>
     public TextInputDialog(
         string title,
         string prompt,
         string initialValue,
         ThemeService themeService,
         AppTheme theme,
-        WindowMaterial material)
+        WindowMaterial material,
+        bool allowEmpty = false)
     {
         InitializeComponent();
         this.themeService = themeService;
         this.theme = theme;
         this.material = material;
+        this.allowEmpty = allowEmpty;
         Title = title;
         TitleText.Text = title;
         PromptText.Text = prompt;
@@ -85,7 +89,7 @@ public partial class TextInputDialog : FluentWindow
     /// <param name="eventArgs">事件参数。</param>
     private void Confirm_Click(object sender, RoutedEventArgs eventArgs)
     {
-        if (Value.Length == 0)
+        if (!allowEmpty && Value.Length == 0)
         {
             MessageBox.Show(this, "输入内容不能为空。", "Kyvoq", MessageBoxButton.OK, MessageBoxImage.Information);
             ValueTextBox.Focus();

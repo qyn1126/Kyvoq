@@ -62,17 +62,24 @@ public sealed class LaunchService : ILaunchService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(item);
+        var stopwatch = Stopwatch.StartNew();
+        DiagnosticLog.Current.Write("Launch.Start",
+            $"Item={item.Id}; Name={item.Name}; Type={TargetClassifier.Classify(item.Target)}; "
+            + $"Administrator={item.RunAsAdministrator}; EnvironmentVariableCount={item.EnvironmentVariables.Count}");
         try
         {
             if (TargetClassifier.Classify(item.Target) == LauncherTargetType.Application
                 && item.RunAsAdministrator
                 && item.EnvironmentVariables.Count > 0)
             {
-                return elevatedLaunchBroker is null
+                var result = elevatedLaunchBroker is null
                     ? LaunchResult.Failure("管理员环境变量启动服务不可用。")
                     : await elevatedLaunchBroker
                         .LaunchAsync(item, cancellationToken)
                         .ConfigureAwait(false);
+                DiagnosticLog.Current.Write("Launch.Completed",
+                    $"Item={item.Id}; Success={result.IsSuccessful}; ElapsedMs={stopwatch.ElapsedMilliseconds}; Error={result.ErrorMessage}");
+                return result;
             }
 
             var startInfo = CreateStartInfo(item);
@@ -82,10 +89,12 @@ public sealed class LaunchService : ILaunchService
                     using var process = processStarter(startInfo);
                 },
                 cancellationToken).ConfigureAwait(false);
+            DiagnosticLog.Current.Write("Launch.Completed", $"Item={item.Id}; Success=True; ElapsedMs={stopwatch.ElapsedMilliseconds}");
             return LaunchResult.Success();
         }
         catch (Win32Exception exception) when (exception.NativeErrorCode == 1223)
         {
+            DiagnosticLog.Current.Write("Launch.Cancelled", $"Item={item.Id}; 管理员权限请求被取消。", exception);
             return LaunchResult.Failure("已取消管理员权限请求。");
         }
         catch (Exception exception) when (exception is Win32Exception
@@ -94,7 +103,13 @@ public sealed class LaunchService : ILaunchService
             or UnauthorizedAccessException
             or InvalidOperationException)
         {
+            DiagnosticLog.Current.Write("Launch.Failed", $"Item={item.Id}; ElapsedMs={stopwatch.ElapsedMilliseconds}", exception);
             return LaunchResult.Failure($"无法启动“{item.Name}”：{exception.Message}");
+        }
+        catch (Exception exception)
+        {
+            DiagnosticLog.Current.Write("Launch.UnexpectedError", $"Item={item.Id}", exception);
+            throw;
         }
     }
 
